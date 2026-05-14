@@ -217,6 +217,7 @@ class KimiSoul:
 
         self._slash_commands = self._build_slash_commands()
         self._slash_command_map = self._index_slash_commands(self._slash_commands)
+        self._activity: str = ""
 
     @property
     def name(self) -> str:
@@ -493,6 +494,7 @@ class KimiSoul:
             context_tokens=token_count,
             max_context_tokens=max_size,
             mcp_status=self._mcp_status_snapshot(),
+            activity=self._activity,
         )
 
     @property
@@ -532,7 +534,10 @@ class KimiSoul:
         """Wait for any in-flight MCP startup to finish."""
         if not isinstance(self._agent.toolset, KimiToolset):
             return
-        await self._agent.toolset.wait_for_mcp_tools()
+        # Total timeout = 2x per-server timeout to allow parallel connections
+        timeout_ms = self._runtime.config.mcp.client.tool_call_timeout_ms
+        timeout_s = timeout_ms * 2 / 1000.0
+        await self._agent.toolset.wait_for_mcp_tools(timeout_s=timeout_s)
 
     async def _checkpoint(self):
         await self._context.checkpoint(self._checkpoint_with_user_message)
@@ -627,6 +632,7 @@ class KimiSoul:
 
             wire_send(TurnBegin(user_input=user_input))
             turn_started = True
+            self._activity = "Thinking..."
             from kimi_cli.telemetry import track as _track_telemetry
 
             _track_telemetry("turn_started", mode="plan" if self._plan_mode else "agent")
@@ -697,6 +703,7 @@ class KimiSoul:
                             save_session_state(fresh, session.dir)
                         session.state.custom_title = fresh.custom_title
         finally:
+            self._activity = ""
             if turn_started and not turn_finished:
                 wire_send(TurnEnd())
                 from kimi_cli.telemetry import track as _track_telemetry

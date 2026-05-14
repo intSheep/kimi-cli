@@ -581,7 +581,9 @@ class KimiToolset:
             try:
                 assert server_info.client is not None
                 async with server_info.client as client:
-                    for tool in await client.list_tools():
+                    timeout_s = runtime.config.mcp.client.tool_call_timeout_ms / 1000.0
+                    tools_result = await asyncio.wait_for(client.list_tools(), timeout=timeout_s)
+                    for tool in tools_result:
                         server_info.tools.append(
                             MCPTool(server_name, tool, client, runtime=runtime)
                         )
@@ -690,13 +692,26 @@ class KimiToolset:
         """Return True if the background MCP tool-loading task is still running."""
         return self._mcp_loading_task is not None and not self._mcp_loading_task.done()
 
-    async def wait_for_mcp_tools(self) -> None:
-        """Wait for background MCP tool loading to finish."""
+    async def wait_for_mcp_tools(self, timeout_s: float | None = None) -> None:
+        """Wait for background MCP tool loading to finish.
+
+        Args:
+            timeout_s: Maximum seconds to wait. If None, waits indefinitely.
+        """
         task = self._mcp_loading_task
         if not task:
             return
         try:
-            await task
+            if timeout_s is not None:
+                await asyncio.wait_for(task, timeout=timeout_s)
+            else:
+                await task
+        except TimeoutError:
+            logger.warning("MCP tool loading timed out after {timeout}s", timeout=timeout_s)
+            task.cancel()
+            with contextlib.suppress(Exception):
+                await task
+            raise
         finally:
             if self._mcp_loading_task is task and task.done():
                 self._mcp_loading_task = None

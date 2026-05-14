@@ -98,6 +98,8 @@ class StatusSnapshot:
     """The maximum number of tokens the context can hold."""
     mcp_status: MCPStatusSnapshot | None = None
     """The current MCP startup snapshot, if MCP is configured."""
+    activity: str = ""
+    """A one-line hint describing what the agent is currently doing."""
 
 
 @runtime_checkable

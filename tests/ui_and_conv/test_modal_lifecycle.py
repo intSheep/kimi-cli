@@ -852,7 +852,6 @@ async def test_render_agent_status_excludes_panels_in_interactive() -> None:
     view._turn_ended = False
     view._btw_spinner = None
     view._btw_question = None
-    view._mcp_loading_spinner = None
     view._mooning_spinner = Spinner("moon", "")
     view._active_turn_depth = 0
     view._compacting_spinner = None
