@@ -1639,6 +1639,11 @@ class CustomPromptSession:
         has_content = bool(agent_status or body)
         if has_content:
             fragments.append(("", "\n"))
+        # Activity hint in shell mode too
+        status = self._status_provider()
+        if status.activity:
+            fragments.append(("class:activity-hint", f"{status.activity}"))
+            fragments.append(("", "\n"))
         # Shell mode: simple separator + $ prefix (no panel border)
         fragments.append(("class:running-prompt-separator", "─" * max(0, columns)))
         fragments.append(("", "\n"))
@@ -1792,10 +1797,15 @@ class CustomPromptSession:
         if self._active_modal_delegate() is not None:
             return fragments
 
-        # 4. Input section header — style varies by mode:
+        # 4. Activity hint — one-line summary of what the agent is doing.
+        status = self._status_provider()
+        if status.activity:
+            fragments.append(("class:activity-hint", f"{status.activity}"))
+            fragments.append(("", "\n"))
+
+        # 5. Input section header — style varies by mode:
         #    normal:  ── input ─────────────────  (grey, solid)
         #    plan:    ╌╌ input · plan ╌╌╌╌╌╌╌╌╌  (blue, dashed)
-        status = self._status_provider()
         # Build title parts
         title_parts = ["input"]
         if status.plan_mode:
@@ -1814,7 +1824,6 @@ class CustomPromptSession:
             style = "class:running-prompt-separator"
         border_fill = max(0, columns - len(title) - 2)
         top_border = f"{dash}{dash}{title}{dash * border_fill}"
-        fragments.append(("", "\n"))
         fragments.append((style, top_border))
         fragments.append(("", "\n"))
         fragments.append(("", " "))
@@ -2196,6 +2205,15 @@ class CustomPromptSession:
                 break
             fragments.extend([(tc.bg_tasks, bg_text), ("", "  ")])
             remaining -= bg_width + 2
+
+        # MCP status (compact) — shown when MCP is configured.
+        mcp_snap = status.mcp_status
+        if mcp_snap is not None and mcp_snap.total > 0:
+            mcp_text = f"mcp {mcp_snap.connected}/{mcp_snap.total}"
+            mcp_width = _display_width(mcp_text)
+            if remaining >= mcp_width + 2:
+                fragments.extend([(tc.mcp, mcp_text), ("", "  ")])
+                remaining -= mcp_width + 2
 
         # Tips fill remaining space on line 1
         tip_text = self._get_two_rotating_tips()

@@ -217,6 +217,7 @@ class KimiSoul:
 
         self._slash_commands = self._build_slash_commands()
         self._slash_command_map = self._index_slash_commands(self._slash_commands)
+        self._activity: str = ""
 
     @property
     def name(self) -> str:
@@ -493,6 +494,7 @@ class KimiSoul:
             context_tokens=token_count,
             max_context_tokens=max_size,
             mcp_status=self._mcp_status_snapshot(),
+            activity=self._activity,
         )
 
     @property
@@ -627,6 +629,7 @@ class KimiSoul:
 
             wire_send(TurnBegin(user_input=user_input))
             turn_started = True
+            self._activity = "Thinking..."
             from kimi_cli.telemetry import track as _track_telemetry
 
             _track_telemetry("turn_started", mode="plan" if self._plan_mode else "agent")
@@ -697,6 +700,7 @@ class KimiSoul:
                             save_session_state(fresh, session.dir)
                         session.state.custom_title = fresh.custom_title
         finally:
+            self._activity = ""
             if turn_started and not turn_finished:
                 wire_send(TurnEnd())
                 from kimi_cli.telemetry import track as _track_telemetry
