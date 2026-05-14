@@ -852,13 +852,13 @@ async def test_render_agent_status_excludes_panels_in_interactive() -> None:
     view._turn_ended = False
     view._btw_spinner = None
     view._btw_question = None
-    view._mcp_loading_spinner = None
     view._mooning_spinner = Spinner("moon", "")
     view._active_turn_depth = 0
     view._compacting_spinner = None
     view._current_content_block = None
     view._tool_call_blocks = {}
     view._current_step_retry = None
+    view._turn_recap = None
     view._live_notification_blocks = cast(
         Any, type("deque", (), {"__iter__": lambda self: iter([])})()
     )

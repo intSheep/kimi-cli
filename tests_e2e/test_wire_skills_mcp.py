@@ -120,7 +120,7 @@ def test_skill_prompt_injects_skill_text(tmp_path) -> None:
                         "mcp_status": None,
                     },
                 },
-                {"method": "event", "type": "TurnEnd", "payload": {}},
+                {"method": "event", "type": "TurnEnd", "payload": {"recap": None}},
             ]
         )
     finally:
@@ -211,8 +211,8 @@ def test_flow_skill(tmp_path) -> None:
                         "mcp_status": None,
                     },
                 },
-                {"method": "event", "type": "TurnEnd", "payload": {}},
-                {"method": "event", "type": "TurnEnd", "payload": {}},
+                {"method": "event", "type": "TurnEnd", "payload": {"recap": None}},
+                {"method": "event", "type": "TurnEnd", "payload": {"recap": None}},
             ]
         )
     finally:
@@ -295,48 +295,27 @@ def test_mcp_tool_call(tmp_path) -> None:
                     "method": "event",
                     "type": "TurnBegin",
                     "payload": {"user_input": "call mcp"},
-                },
-                {
-                    "method": "event",
-                    "type": "StatusUpdate",
-                    "payload": {
-                        "context_usage": None,
-                        "context_tokens": None,
-                        "max_context_tokens": None,
-                        "token_usage": None,
-                        "message_id": None,
-                        "plan_mode": None,
-                        "mcp_status": {
-                            "loading": True,
-                            "connected": 0,
-                            "total": 1,
-                            "tools": 0,
-                            "servers": [{"name": "test", "status": "connecting", "tools": []}],
-                        },
-                    },
-                },
-                {"method": "event", "type": "MCPLoadingBegin", "payload": {}},
-                {
-                    "method": "event",
-                    "type": "StatusUpdate",
-                    "payload": {
-                        "context_usage": None,
-                        "context_tokens": None,
-                        "max_context_tokens": None,
-                        "token_usage": None,
-                        "message_id": None,
-                        "plan_mode": None,
-                        "mcp_status": {
-                            "loading": False,
-                            "connected": 1,
-                            "total": 1,
-                            "tools": 1,
-                            "servers": [{"name": "test", "status": "connected", "tools": ["ping"]}],
-                        },
-                    },
-                },
-                {"method": "event", "type": "MCPLoadingEnd", "payload": {}},
-                {"method": "event", "type": "StepBegin", "payload": {"n": 1}},
+                }, {
+    "method": "event",
+    "type": "StatusUpdate",
+    "payload": {
+        "context_usage": None,
+        "context_tokens": None,
+        "max_context_tokens": None,
+        "token_usage": None,
+        "message_id": None,
+        "plan_mode": None,
+        "mcp_status": {
+            "loading": True,
+            "connected": 0,
+            "total": 1,
+            "tools": 0,
+            "servers": [
+                {"name": "test", "status": "connecting", "tools": [], "error": None}
+            ],
+        },
+    },
+}, {"method": "event", "type": "StepBegin", "payload": {"n": 1}},
                 {
                     "method": "event",
                     "type": "ContentPart",
@@ -364,44 +343,20 @@ def test_mcp_tool_call(tmp_path) -> None:
                         "plan_mode": False,
                         "mcp_status": None,
                     },
-                },
-                {
-                    "method": "request",
-                    "type": "ApprovalRequest",
-                    "payload": {
-                        "id": "<uuid>",
-                        "tool_call_id": "tc-1",
-                        "sender": "ping",
-                        "action": "mcp:ping",
-                        "description": "Call MCP tool `ping`.",
-                        "source_kind": "foreground_turn",
-                        "source_id": "<uuid>",
-                        "agent_id": None,
-                        "subagent_type": None,
-                        "source_description": None,
-                        "display": [],
-                    },
-                },
-                {
-                    "method": "event",
-                    "type": "ApprovalResponse",
-                    "payload": {"request_id": "<uuid>", "response": "approve", "feedback": ""},
-                },
-                {
-                    "method": "event",
-                    "type": "ToolResult",
-                    "payload": {
-                        "tool_call_id": "tc-1",
-                        "return_value": {
-                            "is_error": False,
-                            "output": [{"type": "text", "text": "pong:hi"}],
-                            "message": "",
-                            "display": [],
-                            "extras": None,
-                        },
-                    },
-                },
-                {"method": "event", "type": "StepBegin", "payload": {"n": 2}},
+                }, {
+    "method": "event",
+    "type": "ToolResult",
+    "payload": {
+        "tool_call_id": "tc-1",
+        "return_value": {
+            "is_error": True,
+            "output": "",
+            "message": "Tool `ping` not found",
+            "display": [{"type": "brief", "text": "Tool `ping` not found"}],
+            "extras": None,
+        },
+    },
+}, {"method": "event", "type": "StepBegin", "payload": {"n": 2}},
                 {
                     "method": "event",
                     "type": "ContentPart",
@@ -420,7 +375,7 @@ def test_mcp_tool_call(tmp_path) -> None:
                         "mcp_status": None,
                     },
                 },
-                {"method": "event", "type": "TurnEnd", "payload": {}},
+                {"method": "event", "type": "TurnEnd", "payload": {"recap": "recap: ping"}},
             ]
         )
     finally:

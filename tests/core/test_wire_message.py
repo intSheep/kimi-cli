@@ -76,7 +76,7 @@ async def test_wire_message_serde():
     _test_serde(msg)
 
     msg = TurnEnd()
-    assert serialize_wire_message(msg) == snapshot({"type": "TurnEnd", "payload": {}})
+    assert serialize_wire_message(msg) == snapshot({"type": "TurnEnd", "payload": {"recap": None}})
     _test_serde(msg)
 
     msg = SteerInput(user_input="Follow up")
@@ -183,8 +183,7 @@ async def test_wire_message_serde():
                         {
                             "name": "context7",
                             "status": "connecting",
-                            "tools": [],
-                        }
+                            "tools": [], "error": None}
                     ],
                 },
             },

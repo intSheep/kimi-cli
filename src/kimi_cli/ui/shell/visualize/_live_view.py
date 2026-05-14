@@ -53,8 +53,6 @@ from kimi_cli.wire.types import (
     CompactionBegin,
     CompactionEnd,
     ContentPart,
-    MCPLoadingBegin,
-    MCPLoadingEnd,
     Notification,
     PlanDisplay,
     QuestionRequest,
@@ -138,7 +136,6 @@ class _LiveView:
         self._mooning_spinner = Spinner("moon", "")
         self._active_turn_depth = 0
         self._compacting_spinner: Spinner | None = None
-        self._mcp_loading_spinner: Spinner | None = None
         self._btw_spinner: Spinner | None = None
         self._btw_question: str | None = None
 
@@ -146,6 +143,7 @@ class _LiveView:
         self._tool_call_blocks: dict[str, _ToolCallBlock] = {}
         self._last_tool_call_block: _ToolCallBlock | None = None
         self._current_step_retry: StepRetry | None = None
+        self._turn_recap: str | None = None
         self._approval_request_queue = deque[ApprovalRequest]()
         """
         It is possible that multiple subagents request approvals at the same time,
@@ -371,9 +369,7 @@ class _LiveView:
         blocks: list[RenderableType] = []
         if self._btw_spinner is not None:
             blocks.append(self._btw_spinner)
-        if self._mcp_loading_spinner is not None:
-            blocks.append(self._mcp_loading_spinner)
-        elif self._compacting_spinner is not None:
+        if self._compacting_spinner is not None:
             blocks.append(self._compacting_spinner)
         else:
             has_main_content = False
@@ -388,6 +384,8 @@ class _LiveView:
                 has_main_content = True
             if not has_main_content and self._active_turn_depth > 0:
                 blocks.append(self._mooning_spinner)
+        if self._turn_recap is not None:
+            blocks.append(Text(self._turn_recap, style="dim italic"))
         for notification in list(self._live_notification_blocks):
             blocks.append(notification.compose())
         return blocks
@@ -417,7 +415,6 @@ class _LiveView:
 
         if isinstance(msg, StepBegin):
             self.cleanup(is_interrupt=False)
-            self._mcp_loading_spinner = None
             # Defensive: if StepBegin arrives without a preceding TurnBegin
             # (e.g. during replay), ensure the turn is considered active.
             if self._active_turn_depth == 0:
@@ -432,6 +429,7 @@ class _LiveView:
         match msg:
             case TurnBegin():
                 self._active_turn_depth += 1
+                self._turn_recap = None
                 self.flush_content()
                 self.refresh_soon()
             case SteerInput(user_input=user_input):
@@ -443,19 +441,16 @@ class _LiveView:
                     content = [TextPart(text=user_input)]
                 console.print(render_user_echo(Message(role="user", content=content)))
                 console.print()
-            case TurnEnd():
+            case TurnEnd(recap=recap):
                 self._active_turn_depth = max(0, self._active_turn_depth - 1)
+                if recap:
+                    self._turn_recap = recap
+                self.refresh_soon()
             case CompactionBegin():
                 self._compacting_spinner = Spinner("balloon", "Compacting...")
                 self.refresh_soon()
             case CompactionEnd():
                 self._compacting_spinner = None
-                self.refresh_soon()
-            case MCPLoadingBegin():
-                self._mcp_loading_spinner = Spinner("dots", "Connecting to MCP servers...")
-                self.refresh_soon()
-            case MCPLoadingEnd():
-                self._mcp_loading_spinner = None
                 self.refresh_soon()
             case BtwBegin(question=question):
                 truncated = (question[:40] + "...") if len(question) > 40 else question
@@ -683,7 +678,6 @@ class _LiveView:
 
         # Clear transient spinners to prevent visual residuals after interrupts
         self._compacting_spinner = None
-        self._mcp_loading_spinner = None
         self._btw_spinner = None
         self._current_step_retry = None
 

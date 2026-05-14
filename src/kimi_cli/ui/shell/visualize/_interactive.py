@@ -233,6 +233,8 @@ class _PromptLiveView(_LiveView):
                 if isinstance(msg, TurnEnd):
                     self._active_turn_depth = max(0, self._active_turn_depth - 1)
                     self._turn_ended = self._active_turn_depth == 0
+                    if msg.recap:
+                        self._turn_recap = msg.recap
                     self._flush_prompt_refresh()
                     continue
 
@@ -371,7 +373,7 @@ class _PromptLiveView(_LiveView):
         approval/question panels here.  Those panels are rendered by their
         respective modal delegates in Layer 2.
         """
-        if self._turn_ended:
+        if self._turn_ended and self._turn_recap is None:
             return ANSI("")
         blocks = self.compose_agent_output()
         if not blocks:

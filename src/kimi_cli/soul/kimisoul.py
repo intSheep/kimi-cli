@@ -72,8 +72,6 @@ from kimi_cli.wire.types import (
     CompactionBegin,
     CompactionEnd,
     ContentPart,
-    MCPLoadingBegin,
-    MCPLoadingEnd,
     StatusUpdate,
     SteerInput,
     StepBegin,
@@ -188,6 +186,7 @@ class KimiSoul:
 
         self._steer_queue: asyncio.Queue[str | list[ContentPart]] = asyncio.Queue()
         self._last_tool_calls: list[tuple[str, str]] = []
+        self._turn_tool_stats: dict[str, int] = {}
         self._plan_mode: bool = self._runtime.session.state.plan_mode
         self._plan_session_id: str | None = self._runtime.session.state.plan_session_id
         self._current_turn_id: str = ""
@@ -217,6 +216,7 @@ class KimiSoul:
 
         self._slash_commands = self._build_slash_commands()
         self._slash_command_map = self._index_slash_commands(self._slash_commands)
+        self._activity: str = ""
 
     @property
     def name(self) -> str:
@@ -493,6 +493,7 @@ class KimiSoul:
             context_tokens=token_count,
             max_context_tokens=max_size,
             mcp_status=self._mcp_status_snapshot(),
+            activity=self._activity,
         )
 
     @property
@@ -522,6 +523,20 @@ class KimiSoul:
             return None
         return self._agent.toolset.mcp_status_snapshot()
 
+    def _build_turn_recap(self) -> str | None:
+        """Build a one-line recap of the current turn for UI anchoring."""
+        if not self._turn_tool_stats:
+            return None
+        parts: list[str] = []
+        for name, count in self._turn_tool_stats.items():
+            # Human-friendly tool name mapping
+            display = name.replace("_", " ")
+            if count == 1:
+                parts.append(display)
+            else:
+                parts.append(f"{display} x{count}")
+        return f"recap: {', '.join(parts)}"
+
     async def start_background_mcp_loading(self) -> bool:
         """Start deferred MCP loading, if any, without exposing toolset internals."""
         if not isinstance(self._agent.toolset, KimiToolset):
@@ -532,7 +547,10 @@ class KimiSoul:
         """Wait for any in-flight MCP startup to finish."""
         if not isinstance(self._agent.toolset, KimiToolset):
             return
-        await self._agent.toolset.wait_for_mcp_tools()
+        # Total timeout = 2x per-server timeout to allow parallel connections
+        timeout_ms = self._runtime.config.mcp.client.tool_call_timeout_ms
+        timeout_s = timeout_ms * 2 / 1000.0
+        await self._agent.toolset.wait_for_mcp_tools(timeout_s=timeout_s)
 
     async def _checkpoint(self):
         await self._context.checkpoint(self._checkpoint_with_user_message)
@@ -627,6 +645,8 @@ class KimiSoul:
 
             wire_send(TurnBegin(user_input=user_input))
             turn_started = True
+            self._turn_tool_stats = {}
+            self._activity = "Thinking..."
             from kimi_cli.telemetry import track as _track_telemetry
 
             _track_telemetry("turn_started", mode="plan" if self._plan_mode else "agent")
@@ -670,7 +690,8 @@ class KimiSoul:
                             self._stop_hook_active = False
                         break
 
-            wire_send(TurnEnd())
+            recap = self._build_turn_recap()
+            wire_send(TurnEnd(recap=recap))
             turn_finished = True
 
             # Auto-set title after first real turn (skip slash commands)
@@ -697,8 +718,9 @@ class KimiSoul:
                             save_session_state(fresh, session.dir)
                         session.state.custom_title = fresh.custom_title
         finally:
+            self._activity = ""
             if turn_started and not turn_finished:
-                wire_send(TurnEnd())
+                wire_send(TurnEnd(recap=None))
                 from kimi_cli.telemetry import track as _track_telemetry
 
                 _track_telemetry(
@@ -842,32 +864,6 @@ class KimiSoul:
             loading = bool((snapshot := self._mcp_status_snapshot()) and snapshot.loading)
             if loading:
                 wire_send(StatusUpdate(mcp_status=snapshot))
-                wire_send(MCPLoadingBegin())
-            try:
-                await self.wait_for_background_mcp_loading()
-                # Track MCP connection result
-                if loading:
-                    from kimi_cli.telemetry import track as _track_mcp
-
-                    mcp_snap = self._mcp_status_snapshot()
-                    if mcp_snap:
-                        if mcp_snap.connected > 0:
-                            _track_mcp(
-                                "mcp_connected",
-                                server_count=mcp_snap.connected,
-                                total_count=mcp_snap.total,
-                            )
-                        _failed = mcp_snap.total - mcp_snap.connected
-                        if _failed > 0:
-                            _track_mcp(
-                                "mcp_failed",
-                                failed_count=_failed,
-                                total_count=mcp_snap.total,
-                            )
-            finally:
-                if loading:
-                    wire_send(StatusUpdate(mcp_status=self._mcp_status_snapshot()))
-                    wire_send(MCPLoadingEnd())
 
         # ═══════════════════════════════════════════════════════════════════════
         # 2. STEP LOOP
@@ -1156,7 +1152,17 @@ class KimiSoul:
         # ═══════════════════════════════════════════════════════════════════════
         # wait for all tool results (may be interrupted)
         plan_mode_before_tools = self._plan_mode
+        if result.tool_calls:
+            names = [tc.function.name for tc in result.tool_calls]
+            for name in names:
+                self._turn_tool_stats[name] = self._turn_tool_stats.get(name, 0) + 1
+            if len(names) == 1:
+                self._activity = f"Running {names[0]}..."
+            else:
+                self._activity = f"Running {len(names)} tools ({', '.join(names)})..."
         results = await result.tool_results()
+        if result.tool_calls:
+            self._activity = "Thinking..."
         logger.debug("Got tool results: {results}", results=results)
 
         # Update dedup tracking for the next step

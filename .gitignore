@@ -48,4 +48,8 @@ node_modules/
 static/
 .memo/
 .entire
-.claude
+.claude.gitnexus/
+.claude/
+
+# GitNexus local index
+.gitnexus/

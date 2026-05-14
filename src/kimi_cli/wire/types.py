@@ -60,6 +60,9 @@ class TurnEnd(BaseModel):
     If the turn is interrupted, this event may be omitted.
     """
 
+    recap: str | None = None
+    """Optional one-line summary of what happened in this turn for UI anchoring."""
+
     pass
 
 
