@@ -877,6 +877,12 @@ class Shell:
                         wait=wait,
                         exc=e,
                     )
+                    toast(
+                        f"Title call failed ({attempt + 1}/{max_attempts}), retrying...",
+                        topic="llm_retry",
+                        duration=3.0,
+                        position="right",
+                    )
                     await asyncio.sleep(wait)
         if last_exc is not None:
             logger.debug("Task title generation failed after all retries: {exc}", exc=last_exc)
@@ -928,6 +934,12 @@ class Shell:
                         max=max_attempts,
                         wait=wait,
                         exc=e,
+                    )
+                    toast(
+                        f"Task detection failed ({attempt + 1}/{max_attempts}), retrying...",
+                        topic="llm_retry",
+                        duration=3.0,
+                        position="right",
                     )
                     await asyncio.sleep(wait)
         if last_exc is not None:

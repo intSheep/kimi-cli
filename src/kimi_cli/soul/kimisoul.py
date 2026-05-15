@@ -583,6 +583,14 @@ class KimiSoul:
                         wait=wait,
                         exc=e,
                     )
+                    from kimi_cli.ui.shell.prompt import toast
+
+                    toast(
+                        f"Activity call failed ({attempt + 1}/{max_attempts}), retrying...",
+                        topic="llm_retry",
+                        duration=3.0,
+                        position="right",
+                    )
                     await asyncio.sleep(wait)
         if last_exc is not None:
             logger.debug("Activity generation failed after all retries: {exc}", exc=last_exc)
