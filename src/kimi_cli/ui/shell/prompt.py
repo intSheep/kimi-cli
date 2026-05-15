@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import math
 import os
 import random
 import re
@@ -1645,8 +1646,7 @@ class CustomPromptSession:
         status = self._status_provider()
         if status.activity:
             self._ensure_activity_pulse()
-            colors = ["#555555", "#777777", "#999999", "#bbbbbb", "#999999", "#777777"]
-            color = colors[self._activity_pulse_index % len(colors)]
+            color = self._breathing_color(self._activity_pulse_index)
             activity_text = status.activity
             padding = max(0, (columns - len(activity_text)) // 2)
             centered = " " * padding + activity_text
@@ -1771,10 +1771,21 @@ class CustomPromptSession:
             self._activity_pulse_task = None
         self._activity_pulse_index = 0
 
+    @staticmethod
+    def _breathing_color(index: int) -> str:
+        """Generate a smooth greyscale color via sine wave for breathing effect.
+
+        One full breath cycle is ~3 s (30 steps at 100 ms). Brightness oscillates
+        between #555555 and #bbbbbb.
+        """
+        t = index * (2 * math.pi / 30)
+        val = int(85 + 102 * (0.5 + 0.5 * math.sin(t)))
+        return f"#{val:02x}{val:02x}{val:02x}"
+
     async def _activity_pulse_loop(self) -> None:
-        """Slowly cycle activity-hint color for a breathing effect (~0.8 s step)."""
+        """Smoothly cycle activity-hint color for a breathing effect (~100 ms step)."""
         while True:
-            await asyncio.sleep(0.8)
+            await asyncio.sleep(0.1)
             self._activity_pulse_index += 1
             self.invalidate()
 
@@ -1836,8 +1847,7 @@ class CustomPromptSession:
         status = self._status_provider()
         if status.activity:
             self._ensure_activity_pulse()
-            colors = ["#555555", "#777777", "#999999", "#bbbbbb", "#999999", "#777777"]
-            color = colors[self._activity_pulse_index % len(colors)]
+            color = self._breathing_color(self._activity_pulse_index)
             activity_text = status.activity
             padding = max(0, (columns - len(activity_text)) // 2)
             centered = " " * padding + activity_text
