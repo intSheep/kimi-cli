@@ -824,13 +824,14 @@ class Shell:
     def _format_terminal_title(self) -> str:
         """Build the terminal title from runtime state.
 
-        If plan mode is active and todos exist, append progress (e.g. 1/4).
+        If todos exist, append progress (e.g. 1/4) regardless of plan mode
+        so the final count remains visible after plan completion.
         """
         runtime = self.soul.runtime if isinstance(self.soul, KimiSoul) else None
         title = runtime.terminal_title if runtime else ""
         if not title:
             title = "Kimi Code"
-        if runtime and runtime.session.state.plan_mode:
+        if runtime:
             todos = runtime.session.state.todos
             total = len(todos)
             if total > 0:
