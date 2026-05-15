@@ -1222,6 +1222,8 @@ class CustomPromptSession:
         self._prompt_buffer_container: ConditionalContainer | None = None
         self._last_ui_state: PromptUIState = PromptUIState.NORMAL_INPUT
         self._suspended_buffer_document: Document | None = None
+        self._activity_pulse_visible = False
+        self._activity_pulse_task: asyncio.Task[Any] | None = None
         clipboard_available = is_clipboard_available()
         media_clipboard_available = is_media_clipboard_available()
         self._tips = _build_toolbar_tips(clipboard_available or media_clipboard_available)
@@ -1642,11 +1644,15 @@ class CustomPromptSession:
         # Activity hint in shell mode too
         status = self._status_provider()
         if status.activity:
-            activity_text = status.activity
+            self._ensure_activity_pulse()
+            pulse = " ·" if self._activity_pulse_visible else ""
+            activity_text = f"recap: {status.activity}{pulse}"
             padding = max(0, (columns - len(activity_text)) // 2)
             centered = " " * padding + activity_text
             fragments.append(("class:activity-hint", centered))
             fragments.append(("", "\n"))
+        else:
+            self._cancel_activity_pulse()
         # Shell mode: simple separator + $ prefix (no panel border)
         fragments.append(("class:running-prompt-separator", "─" * max(0, columns)))
         fragments.append(("", "\n"))
@@ -1746,6 +1752,31 @@ class CustomPromptSession:
         if app is not None:
             app.invalidate()
 
+    def _ensure_activity_pulse(self) -> None:
+        """Start the subtle activity-hint pulse task if not already running."""
+        if self._activity_pulse_task is not None:
+            return
+        try:
+            self._activity_pulse_task = asyncio.get_running_loop().create_task(
+                self._activity_pulse_loop()
+            )
+        except RuntimeError:
+            pass  # no event loop running
+
+    def _cancel_activity_pulse(self) -> None:
+        """Stop the activity-hint pulse task."""
+        if self._activity_pulse_task is not None:
+            self._activity_pulse_task.cancel()
+            self._activity_pulse_task = None
+        self._activity_pulse_visible = False
+
+    async def _activity_pulse_loop(self) -> None:
+        """Slowly toggle a subtle dot on the activity hint (~0.8 s cycle)."""
+        while True:
+            await asyncio.sleep(0.8)
+            self._activity_pulse_visible = not self._activity_pulse_visible
+            self.invalidate()
+
     def _sync_prompt_ui_state(self) -> None:
         new_state = self._active_ui_state()
         old_state = getattr(self, "_last_ui_state", PromptUIState.NORMAL_INPUT)
@@ -1803,11 +1834,15 @@ class CustomPromptSession:
         # 4. Activity hint — one-line summary of what the agent is doing.
         status = self._status_provider()
         if status.activity:
-            activity_text = status.activity
+            self._ensure_activity_pulse()
+            pulse = " ·" if self._activity_pulse_visible else ""
+            activity_text = f"recap: {status.activity}{pulse}"
             padding = max(0, (columns - len(activity_text)) // 2)
             centered = " " * padding + activity_text
             fragments.append(("class:activity-hint", centered))
             fragments.append(("", "\n"))
+        else:
+            self._cancel_activity_pulse()
 
         # 5. Input section header — style varies by mode:
         #    normal:  ── input ─────────────────  (grey, solid)
