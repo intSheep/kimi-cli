@@ -262,6 +262,11 @@ class Config(BaseModel):
         default=True,
         description="Enable anonymous telemetry to help improve kimi-cli. Set to false to disable.",
     )
+    llm_retry_max_attempts: int = Field(
+        default=5,
+        ge=1,
+        description="Maximum retry attempts for lightweight LLM calls (activity/title generation).",
+    )
 
     @model_validator(mode="after")
     def validate_model(self) -> Self:

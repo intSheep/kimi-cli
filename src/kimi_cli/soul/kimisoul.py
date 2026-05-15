@@ -534,6 +534,7 @@ class KimiSoul:
         """Use a lightweight LLM call to summarize what the agent is currently doing.
 
         Focuses on the ACTION / intent, not the LLM's textual answer to the user.
+        Retries on transient LLM errors.
         """
         if self._runtime.llm is None:
             return None
@@ -553,24 +554,39 @@ class KimiSoul:
             f'- "Refactor auth module" → "Refactoring the auth module"\n'
             f"Activity:"
         )
-        try:
-            result = await kosong.step(
-                chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
-                system_prompt=(
-                    "You are an activity summarizer for an AI agent. "
-                    "Output only the activity sentence, no quotes, no explanation."
-                ),
-                toolset=EmptyToolset(),
-                history=[Message(role="user", content=[TextPart(text=prompt)])],
-            )
-        except Exception:
-            logger.debug("Activity generation failed")
-            return None
-        text = "".join(
-            part.text for part in result.message.content if isinstance(part, TextPart)
-        ).strip()
-        text = text.strip('"').strip("'")
-        return text[:70] if text else None
+        max_attempts = self._runtime.config.llm_retry_max_attempts
+        last_exc: Exception | None = None
+        for attempt in range(max_attempts):
+            try:
+                result = await kosong.step(
+                    chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
+                    system_prompt=(
+                        "You are an activity summarizer for an AI agent. "
+                        "Output only the activity sentence, no quotes, no explanation."
+                    ),
+                    toolset=EmptyToolset(),
+                    history=[Message(role="user", content=[TextPart(text=prompt)])],
+                )
+                text = "".join(
+                    part.text for part in result.message.content if isinstance(part, TextPart)
+                ).strip()
+                text = text.strip('"').strip("'")
+                return text[:70] if text else None
+            except (APIConnectionError, APITimeoutError, APIStatusError) as e:
+                last_exc = e
+                if attempt < max_attempts - 1:
+                    wait = min(0.5 * (2 ** attempt), 8.0)
+                    logger.debug(
+                        "Activity generation failed ({attempt}/{max}), retry in {wait}s: {exc}",
+                        attempt=attempt + 1,
+                        max=max_attempts,
+                        wait=wait,
+                        exc=e,
+                    )
+                    await asyncio.sleep(wait)
+        if last_exc is not None:
+            logger.debug("Activity generation failed after all retries: {exc}", exc=last_exc)
+        return None
 
     def _build_turn_recap(self) -> str | None:
         """Build a one-line recap of the current turn for UI anchoring."""

@@ -831,10 +831,14 @@ class Shell:
         set_terminal_title(recap if recap else "Kimi Code")
 
     async def _generate_task_title(self, user_input: str) -> str | None:
-        """Use LLM to generate a ≤10-word title for the user's request."""
+        """Use LLM to generate a ≤10-word title for the user's request.
+
+        Retries on transient LLM errors.
+        """
         if not isinstance(self.soul, KimiSoul) or self.soul.runtime.llm is None:
             return None
         import kosong
+        from kosong.chat_provider import APIConnectionError, APIStatusError, APITimeoutError
         from kosong.message import Message, TextPart
         from kosong.tooling.empty import EmptyToolset
 
@@ -844,30 +848,49 @@ class Shell:
             f"Summarize the user's request in ≤10 words. "
             f"Use the same language as the user.\nRequest: {user_input}\nTitle:"
         )
-        try:
-            result = await kosong.step(
-                chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
-                system_prompt=(
-                    "You are a concise task summarizer. "
-                    "Output only the title, no quotes, no explanation."
-                ),
-                toolset=EmptyToolset(),
-                history=[Message(role="user", content=[TextPart(text=prompt)])],
-            )
-        except Exception:
-            logger.debug("Task title generation failed")
-            return None
-        text = "".join(
-            part.text for part in result.message.content if isinstance(part, TextPart)
-        ).strip()
-        text = text.strip('"').strip("'")
-        return text[:60] if text else None
+        max_attempts = self.soul.runtime.config.llm_retry_max_attempts
+        last_exc: Exception | None = None
+        for attempt in range(max_attempts):
+            try:
+                result = await kosong.step(
+                    chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
+                    system_prompt=(
+                        "You are a concise task summarizer. "
+                        "Output only the title, no quotes, no explanation."
+                    ),
+                    toolset=EmptyToolset(),
+                    history=[Message(role="user", content=[TextPart(text=prompt)])],
+                )
+                text = "".join(
+                    part.text for part in result.message.content if isinstance(part, TextPart)
+                ).strip()
+                text = text.strip('"').strip("'")
+                return text[:60] if text else None
+            except (APIConnectionError, APITimeoutError, APIStatusError) as e:
+                last_exc = e
+                if attempt < max_attempts - 1:
+                    wait = min(0.5 * (2 ** attempt), 8.0)
+                    logger.debug(
+                        "Title generation failed ({attempt}/{max}), retry in {wait}s: {exc}",
+                        attempt=attempt + 1,
+                        max=max_attempts,
+                        wait=wait,
+                        exc=e,
+                    )
+                    await asyncio.sleep(wait)
+        if last_exc is not None:
+            logger.debug("Task title generation failed after all retries: {exc}", exc=last_exc)
+        return None
 
     async def _is_new_task(self, user_input: str) -> bool:
-        """Use LLM to check whether the user's input starts a new task."""
+        """Use LLM to check whether the user's input starts a new task.
+
+        Retries on transient LLM errors.
+        """
         if not isinstance(self.soul, KimiSoul) or self.soul.runtime.llm is None:
             return False
         import kosong
+        from kosong.chat_provider import APIConnectionError, APIStatusError, APITimeoutError
         from kosong.message import Message, TextPart
         from kosong.tooling.empty import EmptyToolset
 
@@ -878,23 +901,38 @@ class Shell:
             f"New input: {user_input}\n"
             f"Is this a completely new, unrelated task? Answer only yes or no."
         )
-        try:
-            result = await kosong.step(
-                chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
-                system_prompt=(
-                    "You determine if a user input starts a new task. "
-                    "Answer only 'yes' or 'no'."
-                ),
-                toolset=EmptyToolset(),
-                history=[Message(role="user", content=[TextPart(text=prompt)])],
-            )
-        except Exception:
-            logger.debug("New-task detection failed")
-            return False
-        text = "".join(
-            part.text for part in result.message.content if isinstance(part, TextPart)
-        ).strip().lower()
-        return text.startswith("yes")
+        max_attempts = self.soul.runtime.config.llm_retry_max_attempts
+        last_exc: Exception | None = None
+        for attempt in range(max_attempts):
+            try:
+                result = await kosong.step(
+                    chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
+                    system_prompt=(
+                        "You determine if a user input starts a new task. "
+                        "Answer only 'yes' or 'no'."
+                    ),
+                    toolset=EmptyToolset(),
+                    history=[Message(role="user", content=[TextPart(text=prompt)])],
+                )
+                text = "".join(
+                    part.text for part in result.message.content if isinstance(part, TextPart)
+                ).strip().lower()
+                return text.startswith("yes")
+            except (APIConnectionError, APITimeoutError, APIStatusError) as e:
+                last_exc = e
+                if attempt < max_attempts - 1:
+                    wait = min(0.5 * (2 ** attempt), 8.0)
+                    logger.debug(
+                        "New-task detection failed ({attempt}/{max}), retry in {wait}s: {exc}",
+                        attempt=attempt + 1,
+                        max=max_attempts,
+                        wait=wait,
+                        exc=e,
+                    )
+                    await asyncio.sleep(wait)
+        if last_exc is not None:
+            logger.debug("New-task detection failed after all retries: {exc}", exc=last_exc)
+        return False
 
     async def _maybe_update_terminal_title(self, user_input: str | list[ContentPart]) -> None:
         """Update the terminal title when a new task is detected."""
