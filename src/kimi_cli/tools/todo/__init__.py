@@ -48,6 +48,13 @@ class SetTodoList(CallableTool2[Params]):
         """Persist the todo list and return confirmation."""
         self._save_todos(todos)
 
+        # If plan mode is active, refresh the terminal title with todo progress
+        if self._runtime.session.state.plan_mode and self._runtime.terminal_title:
+            done = sum(1 for t in todos if t.status == "done")
+            from kimi_cli.utils.proctitle import set_terminal_title
+
+            set_terminal_title(f"{self._runtime.terminal_title} ({done}/{len(todos)})")
+
         items = [TodoDisplayItem(title=todo.title, status=todo.status) for todo in todos]
         return ToolReturnValue(
             is_error=False,

@@ -10,6 +10,8 @@ agent:
     # - "kimi_cli.tools.think:Think"
     - "kimi_cli.tools.ask_user:AskUserQuestion"
     - "kimi_cli.tools.todo:SetTodoList"
+    - "kimi_cli.tools.activity_hint:SetActivityHint"
+    - "kimi_cli.tools.terminal_title:SetTerminalTitle"
     - "kimi_cli.tools.shell:Shell"
     - "kimi_cli.tools.background:TaskList"
     - "kimi_cli.tools.background:TaskOutput"

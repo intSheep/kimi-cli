@@ -196,6 +196,10 @@ class Runtime:
     resumed: bool = False
     hook_engine: Any = None
     """HookEngine instance, set by KimiCLI after soul creation."""
+    activity_hint: str = ""
+    """Current activity hint set by the SetActivityHint tool for UI display."""
+    terminal_title: str = ""
+    """Current terminal title set by the SetTerminalTitle tool for UI display."""
 
     def __post_init__(self) -> None:
         if self.subagent_store is None:

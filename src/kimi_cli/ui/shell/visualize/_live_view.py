@@ -485,6 +485,8 @@ class _LiveView:
                 self.refresh_soon()
             case StatusUpdate():
                 self._status_block.update(msg)
+                if msg.activity is not None:
+                    self.refresh_soon()
             case Notification():
                 self.append_notification(msg)
             case ContentPart():

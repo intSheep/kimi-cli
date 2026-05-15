@@ -201,7 +201,6 @@ class Shell:
         self._current_prompt_approval_request: ApprovalRequest | None = None
         self._approval_modal: ApprovalPromptDelegate | None = None
         self._exit_after_run = False
-        self._terminal_task_title: str | None = None
         soul_slash_commands = list(soul.available_slash_commands)
         shell_slash_commands = shell_slash_registry.list_commands()
         self._available_slash_commands: dict[str, SlashCommand[Any]] = {
@@ -819,168 +818,34 @@ class Shell:
             console.print(f"[red]Unknown error: {e}[/red]")
             raise  # re-raise unknown error
 
+    def _format_terminal_title(self) -> str:
+        """Build the terminal title from runtime state.
+
+        If plan mode is active and todos exist, append progress (e.g. 1/4).
+        """
+        runtime = self.soul.runtime if isinstance(self.soul, KimiSoul) else None
+        title = runtime.terminal_title if runtime else ""
+        if not title:
+            title = "Kimi Code"
+        if runtime and runtime.session.state.plan_mode:
+            todos = runtime.session.state.todos
+            total = len(todos)
+            if total > 0:
+                done = sum(1 for t in todos if t.status == "done")
+                return f"{title} ({done}/{total})"
+        return title
+
     def _update_terminal_title(self, view: Any) -> None:
-        """Update the terminal title from the turn recap produced by the latest turn.
+        """Restore the terminal title after a turn finishes (no busy indicator)."""
+        set_terminal_title(self._format_terminal_title())
 
-        If a task-level title has been set by the LLM, it takes precedence.
-        """
-        if self._terminal_task_title:
-            set_terminal_title(self._terminal_task_title)
-            return
-        recap: str | None = getattr(view, "_turn_recap", None)
-        set_terminal_title(recap if recap else "Kimi Code")
+    def _set_busy_title(self) -> None:
+        """Append a busy indicator to the terminal title while a turn is running."""
+        set_terminal_title(self._format_terminal_title() + " ●")
 
-    async def _generate_task_title(self, user_input: str) -> str | None:
-        """Use LLM to generate a ≤10-word title for the user's request.
-
-        Retries on transient LLM errors.
-        """
-        if not isinstance(self.soul, KimiSoul) or self.soul.runtime.llm is None:
-            return None
-        import kosong
-        from kosong.chat_provider import APIConnectionError, APIStatusError, APITimeoutError
-        from kosong.message import Message, TextPart
-        from kosong.tooling.empty import EmptyToolset
-
-        chat_provider: Any = self.soul.runtime.llm.chat_provider
-        chat_provider = chat_provider.with_generation_kwargs(max_tokens=30)
-        prompt = (
-            f"Summarize the user's request in ≤10 words. "
-            f"Use the same language as the user.\nRequest: {user_input}\nTitle:"
-        )
-        max_attempts = self.soul.runtime.config.llm_retry_max_attempts
-        last_exc: Exception | None = None
-        for attempt in range(max_attempts):
-            try:
-                result = await kosong.step(
-                    chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
-                    system_prompt=(
-                        "You are a concise task summarizer. "
-                        "Output only the title, no quotes, no explanation."
-                    ),
-                    toolset=EmptyToolset(),
-                    history=[Message(role="user", content=[TextPart(text=prompt)])],
-                )
-                text = "".join(
-                    part.text for part in result.message.content if isinstance(part, TextPart)
-                ).strip()
-                text = text.strip('"').strip("'")
-                return text[:60] if text else None
-            except (APIConnectionError, APIEmptyResponseError, APITimeoutError,
-                    APIStatusError) as e:
-                last_exc = e
-                if attempt < max_attempts - 1:
-                    wait = min(0.5 * (2 ** attempt), 8.0)
-                    logger.debug(
-                        "Title generation failed ({attempt}/{max}), retry in {wait}s: {exc}",
-                        attempt=attempt + 1,
-                        max=max_attempts,
-                        wait=wait,
-                        exc=e,
-                    )
-                    toast(
-                        f"Title call failed ({attempt + 1}/{max_attempts}), retrying...",
-                        topic="llm_retry",
-                        duration=3.0,
-                        position="right",
-                    )
-                    await asyncio.sleep(wait)
-        if last_exc is not None:
-            logger.debug("Task title generation failed after all retries: {exc}", exc=last_exc)
-        return None
-
-    async def _is_new_task(self, user_input: str) -> bool:
-        """Use LLM to check whether the user's input starts a new task.
-
-        Retries on transient LLM errors.
-        """
-        if not isinstance(self.soul, KimiSoul) or self.soul.runtime.llm is None:
-            return False
-        import kosong
-        from kosong.chat_provider import APIConnectionError, APIStatusError, APITimeoutError
-        from kosong.message import Message, TextPart
-        from kosong.tooling.empty import EmptyToolset
-
-        chat_provider: Any = self.soul.runtime.llm.chat_provider
-        chat_provider = chat_provider.with_generation_kwargs(max_tokens=10)
-        prompt = (
-            f'Current task: {self._terminal_task_title or "None"}\n'
-            f"New input: {user_input}\n"
-            f"Is this a completely new, unrelated task? Answer only yes or no."
-        )
-        max_attempts = self.soul.runtime.config.llm_retry_max_attempts
-        last_exc: Exception | None = None
-        for attempt in range(max_attempts):
-            try:
-                result = await kosong.step(
-                    chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
-                    system_prompt=(
-                        "You determine if a user input starts a new task. "
-                        "Answer only 'yes' or 'no'."
-                    ),
-                    toolset=EmptyToolset(),
-                    history=[Message(role="user", content=[TextPart(text=prompt)])],
-                )
-                text = "".join(
-                    part.text for part in result.message.content if isinstance(part, TextPart)
-                ).strip().lower()
-                return text.startswith("yes")
-            except (APIConnectionError, APIEmptyResponseError, APITimeoutError,
-                    APIStatusError) as e:
-                last_exc = e
-                if attempt < max_attempts - 1:
-                    wait = min(0.5 * (2 ** attempt), 8.0)
-                    logger.debug(
-                        "New-task detection failed ({attempt}/{max}), retry in {wait}s: {exc}",
-                        attempt=attempt + 1,
-                        max=max_attempts,
-                        wait=wait,
-                        exc=e,
-                    )
-                    toast(
-                        f"Task detection failed ({attempt + 1}/{max_attempts}), retrying...",
-                        topic="llm_retry",
-                        duration=3.0,
-                        position="right",
-                    )
-                    await asyncio.sleep(wait)
-        if last_exc is not None:
-            logger.debug("New-task detection failed after all retries: {exc}", exc=last_exc)
-        return False
-
-    async def _maybe_update_terminal_title(self, user_input: str | list[ContentPart]) -> None:
-        """Update the terminal title when a new task is detected."""
-        if not isinstance(user_input, str):
-            return
-        text = user_input.strip()
-        if not text:
-            return
-        # First interaction always generates a title
-        if self._terminal_task_title is None:
-            title = await self._generate_task_title(text)
-            if title:
-                self._terminal_task_title = title
-                set_terminal_title(title)
-            return
-        # Skip very short or obvious follow-up inputs
-        if len(text) < 15 or text.lower() in {
-            "ok",
-            "thanks",
-            "thank you",
-            "ok.",
-            "yes",
-            "no",
-            "好的",
-            "谢谢",
-            "嗯",
-        }:
-            return
-        # Ask LLM whether this is a new task
-        if await self._is_new_task(text):
-            title = await self._generate_task_title(text)
-            if title:
-                self._terminal_task_title = title
-                set_terminal_title(title)
+    def _maybe_update_terminal_title(self, user_input: str | list[ContentPart]) -> None:
+        """No-op: title is now set exclusively via the SetTerminalTitle tool."""
+        pass
 
     async def run_soul_command(self, user_input: str | list[ContentPart]) -> bool:
         """
@@ -1010,7 +875,8 @@ class Shell:
 
         try:
             if isinstance(user_input, str):
-                await self._maybe_update_terminal_title(user_input)
+                self._maybe_update_terminal_title(user_input)
+            self._set_busy_title()
             snap = self.soul.status
             runtime = self.soul.runtime if isinstance(self.soul, KimiSoul) else None
             show_thinking_stream = runtime.config.show_thinking_stream if runtime else False
@@ -1197,6 +1063,7 @@ class Shell:
                 all_lost.extend(captured_view.drain_queued_messages())
             for msg in all_lost:
                 console.print(f"[yellow]Queued message dropped: {msg.command}[/yellow]")
+            self._update_terminal_title(captured_view)
             self._maybe_present_pending_approvals()
             remove_sigint()
         return False

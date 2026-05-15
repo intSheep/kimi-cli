@@ -201,6 +201,8 @@ class StatusUpdate(BaseModel):
     """Whether plan mode (read-only) is active. None means no change."""
     mcp_status: MCPStatusSnapshot | None = None
     """The current MCP startup snapshot. None means no change."""
+    activity: str | None = None
+    """Current activity hint. None means no change."""
 
 
 class Notification(BaseModel):
@@ -653,9 +655,13 @@ class WireMessageEnvelope(BaseModel):
         assert typename is not None, f"Unknown wire message type: {type(msg)}"
         # TurnEnd omits None-valued fields (e.g. recap) to keep payloads compact.
         exclude_none = isinstance(msg, TurnEnd)
+        payload = msg.model_dump(mode="json", exclude_none=exclude_none)
+        # StatusUpdate: strip activity when unset to avoid bloating every payload
+        if isinstance(msg, StatusUpdate) and payload.get("activity") is None:
+            payload.pop("activity", None)
         return cls(
             type=typename,
-            payload=msg.model_dump(mode="json", exclude_none=exclude_none),
+            payload=payload,
         )
 
     def to_wire_message(self) -> WireMessage:

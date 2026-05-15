@@ -18,12 +18,16 @@ The results of the tool calls will be returned to you in a tool message. You mus
 
 ## Progress Reporting
 
-When working through multi-step tasks, briefly report your progress to the user at natural milestone points:
+When working through multi-step tasks, use the `SetActivityHint` tool to update the status bar whenever you enter a new phase. Call it at these points:
 
-1. **Task start**: Right after the user assigns a new task, briefly state your planned approach — what you will do first and the overall plan (one short sentence, ≤15 words).
-2. **Milestones during execution**: Roughly every 10–20 tool calls, or whenever you complete a significant phase (e.g., finished analyzing the codebase, completed the core implementation, all tests passing).
+1. **Task start**: Right after the user assigns a new task, call `SetActivityHint` with your planned approach.
+2. **Milestones during execution**: Whenever you complete a significant phase (e.g., finished analysis, started implementation, all tests passing).
 
-Keep all updates concise (≤15 words) and use the same language as the user. Do not report progress on every single tool call — only at the start and when the overall phase or status has meaningfully changed.
+Keep the hint to one short sentence (≤15 words) describing what you are currently doing or trying to achieve. Use the same language as the user. Do not call `SetActivityHint` on every single tool call — only when the overall phase has meaningfully changed.
+
+## Terminal Title
+
+Use the `SetTerminalTitle` tool to set the terminal tab title when the user assigns a new task. Keep the title to ≤5 words. Examples: "Refactor auth module", "Fix login bug", "Add test coverage". Do not update the title repeatedly for the same task — one call per task is enough.
 
 The system may insert information wrapped in `<system>` tags within user or tool messages. This information provides supplementary context relevant to the current task — take it into consideration when determining your next action.
 

@@ -497,7 +497,7 @@ class KimiSoul:
             context_tokens=token_count,
             max_context_tokens=max_size,
             mcp_status=self._mcp_status_snapshot(),
-            activity=self._activity,
+            activity=self._runtime.activity_hint or self._activity,
             turn_count=self._turn_count,
             step_count=self._current_step_no,
         )
@@ -739,7 +739,7 @@ class KimiSoul:
             self._recent_tool_calls = []
             user_message = Message(role="user", content=user_input)
             self._current_user_input = user_message.extract_text(" ").strip()
-            self._activity = await self._generate_activity_llm() or "Analyzing your request..."
+            self._activity = self._runtime.activity_hint or "Analyzing your request..."
             from kimi_cli.telemetry import track as _track_telemetry
 
             _track_telemetry("turn_started", mode="plan" if self._plan_mode else "agent")
@@ -1253,12 +1253,6 @@ class KimiSoul:
                 self._recent_tool_calls.append(name)
             self._cumulative_tool_calls += len(names)
         results = await result.tool_results()
-        # Update activity: after every tool call, ask LLM to re-infer the agent's
-        # current intent (why it's doing what it's doing), not just the tool name.
-        if result.tool_calls:
-            refreshed = await self._generate_activity_llm()
-            if refreshed:
-                self._activity = refreshed
         logger.debug("Got tool results: {results}", results=results)
 
         # Update dedup tracking for the next step
