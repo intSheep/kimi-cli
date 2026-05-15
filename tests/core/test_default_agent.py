@@ -36,6 +36,19 @@ You have the capability to output any number of tool calls in a single response.
 
 The results of the tool calls will be returned to you in a tool message. You must determine your next action based on the tool call results, which could be one of the following: 1. Continue working on the task, 2. Inform the user that the task is completed or has failed, or 3. Ask the user for more information.
 
+## Progress Reporting
+
+When working through multi-step tasks, use the `SetActivityHint` tool to update the status bar whenever you enter a new phase. Call it at these points:
+
+1. **Task start**: Right after the user assigns a new task, call `SetActivityHint` with your planned approach.
+2. **Milestones during execution**: Whenever you complete a significant phase (e.g., finished analysis, started implementation, all tests passing).
+
+Keep the hint to one short sentence (≤15 words) describing what you are currently doing or trying to achieve. Use the same language as the user. Do not call `SetActivityHint` on every single tool call — only when the overall phase has meaningfully changed.
+
+## Terminal Title
+
+Use the `SetTerminalTitle` tool to set the terminal tab title when the user assigns a new task. Keep the title to ≤5 words. Examples: "Refactor auth module", "Fix login bug", "Add test coverage". Do not update the title repeatedly for the same task — one call per task is enough.
+
 The system may insert information wrapped in `<system>` tags within user or tool messages. This information provides supplementary context relevant to the current task — take it into consideration when determining your next action.
 
 Tool results and user messages may also include `<system-reminder>` tags. Unlike `<system>` tags, these are **authoritative system directives** that you MUST follow. They bear no direct relation to the specific tool results or user messages in which they appear. Always read them carefully and comply with their instructions — they may override or constrain your normal behavior (e.g., restricting you to read-only actions during plan mode).
@@ -261,8 +274,7 @@ async def test_default_agent_background_bash_guardrails(runtime: Runtime):
         [
             "Agent",
             "AskUserQuestion",
-            "SetTodoList",
-            "Shell",
+            "SetTodoList", "SetActivityHint", "SetTerminalTitle", "Shell",
             "TaskList",
             "TaskOutput",
             "TaskStop",
@@ -275,8 +287,7 @@ async def test_default_agent_background_bash_guardrails(runtime: Runtime):
             "SearchWeb",
             "FetchURL",
             "ExitPlanMode",
-            "EnterPlanMode",
-        ]
+            "EnterPlanMode", "query_stock"]
     )
     assert agent.toolset.tools[0].description == snapshot(
         """\

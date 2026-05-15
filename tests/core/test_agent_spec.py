@@ -29,6 +29,8 @@ def test_load_default_agent_spec():
             "kimi_cli.tools.agent:Agent",
             "kimi_cli.tools.ask_user:AskUserQuestion",
             "kimi_cli.tools.todo:SetTodoList",
+            "kimi_cli.tools.activity_hint:SetActivityHint",
+            "kimi_cli.tools.terminal_title:SetTerminalTitle",
             "kimi_cli.tools.shell:Shell",
             "kimi_cli.tools.background:TaskList",
             "kimi_cli.tools.background:TaskOutput",
@@ -99,8 +101,7 @@ def test_load_default_agent_spec():
         [
             "kimi_cli.tools.agent:Agent",
             "kimi_cli.tools.ask_user:AskUserQuestion",
-            "kimi_cli.tools.todo:SetTodoList",
-            "kimi_cli.tools.shell:Shell",
+            "kimi_cli.tools.todo:SetTodoList", "kimi_cli.tools.activity_hint:SetActivityHint", "kimi_cli.tools.terminal_title:SetTerminalTitle", "kimi_cli.tools.shell:Shell",
             "kimi_cli.tools.background:TaskList",
             "kimi_cli.tools.background:TaskOutput",
             "kimi_cli.tools.background:TaskStop",
@@ -182,8 +183,7 @@ You are meant to be a fast agent. Complete the search request efficiently and re
         [
             "kimi_cli.tools.agent:Agent",
             "kimi_cli.tools.ask_user:AskUserQuestion",
-            "kimi_cli.tools.todo:SetTodoList",
-            "kimi_cli.tools.shell:Shell",
+            "kimi_cli.tools.todo:SetTodoList", "kimi_cli.tools.activity_hint:SetActivityHint", "kimi_cli.tools.terminal_title:SetTerminalTitle", "kimi_cli.tools.shell:Shell",
             "kimi_cli.tools.background:TaskList",
             "kimi_cli.tools.background:TaskOutput",
             "kimi_cli.tools.background:TaskStop",
@@ -249,8 +249,7 @@ Before designing your implementation plan, consider whether you fully understand
         [
             "kimi_cli.tools.agent:Agent",
             "kimi_cli.tools.ask_user:AskUserQuestion",
-            "kimi_cli.tools.todo:SetTodoList",
-            "kimi_cli.tools.shell:Shell",
+            "kimi_cli.tools.todo:SetTodoList", "kimi_cli.tools.activity_hint:SetActivityHint", "kimi_cli.tools.terminal_title:SetTerminalTitle", "kimi_cli.tools.shell:Shell",
             "kimi_cli.tools.background:TaskList",
             "kimi_cli.tools.background:TaskOutput",
             "kimi_cli.tools.background:TaskStop",
@@ -345,8 +344,7 @@ agent:
             [
                 "kimi_cli.tools.agent:Agent",
                 "kimi_cli.tools.ask_user:AskUserQuestion",
-                "kimi_cli.tools.todo:SetTodoList",
-                "kimi_cli.tools.shell:Shell",
+                "kimi_cli.tools.todo:SetTodoList", "kimi_cli.tools.activity_hint:SetActivityHint", "kimi_cli.tools.terminal_title:SetTerminalTitle", "kimi_cli.tools.shell:Shell",
                 "kimi_cli.tools.background:TaskList",
                 "kimi_cli.tools.background:TaskOutput",
                 "kimi_cli.tools.background:TaskStop",

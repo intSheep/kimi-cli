@@ -201,6 +201,9 @@ class Shell:
         self._current_prompt_approval_request: ApprovalRequest | None = None
         self._approval_modal: ApprovalPromptDelegate | None = None
         self._exit_after_run = False
+        self._busy_spinner_task: asyncio.Task[Any] | None = None
+        self._busy_spinner_chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+        self._busy_spinner_index = 0
         soul_slash_commands = list(soul.available_slash_commands)
         shell_slash_commands = shell_slash_registry.list_commands()
         self._available_slash_commands: dict[str, SlashCommand[Any]] = {
@@ -835,13 +838,28 @@ class Shell:
                 return f"{title} ({done}/{total})"
         return title
 
-    def _update_terminal_title(self, view: Any) -> None:
-        """Restore the terminal title after a turn finishes (no busy indicator)."""
-        set_terminal_title(self._format_terminal_title())
+    def _start_busy_spinner(self) -> None:
+        """Start an animated busy spinner in the terminal title while a turn runs."""
+        self._stop_busy_spinner()
+        self._busy_spinner_index = 0
+        self._busy_spinner_task = asyncio.create_task(self._busy_spinner_loop())
 
-    def _set_busy_title(self) -> None:
-        """Append a busy indicator to the terminal title while a turn is running."""
-        set_terminal_title(self._format_terminal_title() + " ●")
+    async def _busy_spinner_loop(self) -> None:
+        """Cycle through braille spinner characters to animate the title."""
+        while True:
+            char = self._busy_spinner_chars[
+                self._busy_spinner_index % len(self._busy_spinner_chars)
+            ]
+            set_terminal_title(f"{char} {self._format_terminal_title()}")
+            self._busy_spinner_index += 1
+            await asyncio.sleep(0.15)
+
+    def _stop_busy_spinner(self) -> None:
+        """Stop the spinner and restore the static title."""
+        if self._busy_spinner_task is not None:
+            self._busy_spinner_task.cancel()
+            self._busy_spinner_task = None
+        set_terminal_title(self._format_terminal_title())
 
     def _maybe_update_terminal_title(self, user_input: str | list[ContentPart]) -> None:
         """No-op: title is now set exclusively via the SetTerminalTitle tool."""
@@ -876,7 +894,7 @@ class Shell:
         try:
             if isinstance(user_input, str):
                 self._maybe_update_terminal_title(user_input)
-            self._set_busy_title()
+            self._start_busy_spinner()
             snap = self.soul.status
             runtime = self.soul.runtime if isinstance(self.soul, KimiSoul) else None
             show_thinking_stream = runtime.config.show_thinking_stream if runtime else False
@@ -925,7 +943,7 @@ class Shell:
             # Clear cancel_event so queued turns aren't tainted by a
             # Ctrl+C that fired during btw dismiss wait.
             cancel_event.clear()
-            self._update_terminal_title(captured_view)
+            self._stop_busy_spinner()
 
             # Drain queued messages and send each as a new turn.
             # Safety valve: cap at 20 "generations" (new batches of messages
@@ -944,6 +962,7 @@ class Shell:
                 queued = pending.pop(0)
                 console.print(render_user_echo_text(queued.command))
                 console.print()
+                self._start_busy_spinner()
                 await run_soul(
                     self.soul,
                     queued.content,
@@ -973,7 +992,7 @@ class Shell:
                 if captured_view is not None:
                     await captured_view.wait_for_btw_dismiss()
                 cancel_event.clear()  # same rationale as above
-                self._update_terminal_title(captured_view)
+                self._stop_busy_spinner()
                 # captured_view is now the view from this turn;
                 # next iteration drains it for any new messages.
             if drain_generation >= _MAX_DRAIN_GENERATIONS:
@@ -1063,7 +1082,7 @@ class Shell:
                 all_lost.extend(captured_view.drain_queued_messages())
             for msg in all_lost:
                 console.print(f"[yellow]Queued message dropped: {msg.command}[/yellow]")
-            self._update_terminal_title(captured_view)
+            self._stop_busy_spinner()
             self._maybe_present_pending_approvals()
             remove_sigint()
         return False

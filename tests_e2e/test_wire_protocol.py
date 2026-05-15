@@ -380,7 +380,7 @@ def test_external_tool_call(tmp_path) -> None:
                         "mcp_status": None,
                     },
                 },
-                {"method": "event", "type": "TurnEnd", "payload": {}},
+                {"method": "event", "type": "TurnEnd", "payload": {"recap": "recap: ext tool"}},
             ]
         )
     finally:
