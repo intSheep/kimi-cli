@@ -13,13 +13,21 @@ def set_process_title(title: str) -> None:
         pass
 
 
+_last_title: str = ""
+
+
 def set_terminal_title(title: str) -> None:
     """Set the terminal tab/window title via ANSI OSC escape sequence.
 
     Only writes when stderr is a TTY to avoid polluting piped output.
+    Skips duplicate writes to prevent terminal flicker.
     """
+    global _last_title
     if not sys.stderr.isatty():
         return
+    if title == _last_title:
+        return
+    _last_title = title
     try:
         sys.stderr.write(f"\033]0;{title}\007")
         sys.stderr.flush()
