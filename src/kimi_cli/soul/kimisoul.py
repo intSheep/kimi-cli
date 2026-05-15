@@ -133,6 +133,29 @@ def classify_api_error(e: Exception) -> tuple[str, int | None]:
     return "other", None
 
 
+def _derive_default_title(user_input: str) -> str:
+    """Derive a short task title from user input as a soft fallback.
+
+    Strips common polite prefixes, extracts the first few content words,
+    and limits to 40 characters.
+    """
+    import re
+
+    text = user_input.strip()
+    # Strip common Chinese/English polite prefixes
+    for prefix in ("请", "帮我", "可以", "能不能", "能不能帮我", "请帮我", "please", "can you", "could you"):
+        if text.lower().startswith(prefix.lower()):
+            text = text[len(prefix):].strip()
+            break
+    # Remove leading punctuation
+    text = text.lstrip("，,。.:：;；!！?？")
+    # Split on whitespace and punctuation, keep non-empty tokens
+    tokens = re.split(r"[\s，,。.:：;；!！?？]+", text)
+    tokens = [t for t in tokens if t]
+    title = " ".join(tokens[:5])
+    return title[:40] if title else text[:40]
+
+
 type StepStopReason = Literal["no_tool_calls", "tool_rejected"]
 
 
@@ -740,6 +763,20 @@ class KimiSoul:
             user_message = Message(role="user", content=user_input)
             self._current_user_input = user_message.extract_text(" ").strip()
             self._activity = self._runtime.activity_hint or "Analyzing your request..."
+
+            # Soft fallback: if the AI hasn't set a terminal title, derive one
+            # from user input so the tab is never completely generic. The AI
+            # can still override this by calling SetTerminalTitle.
+            if not self._runtime.terminal_title and self._current_user_input:
+                text = self._current_user_input
+                if not text.startswith("<") and len(text) > 3:
+                    derived = _derive_default_title(text)
+                    if derived:
+                        self._runtime.terminal_title = derived
+                        from kimi_cli.utils.proctitle import set_terminal_title
+
+                        set_terminal_title(derived)
+
             from kimi_cli.telemetry import track as _track_telemetry
 
             _track_telemetry("turn_started", mode="plan" if self._plan_mode else "agent")

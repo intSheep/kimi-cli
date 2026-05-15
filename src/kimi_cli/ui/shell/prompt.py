@@ -1222,7 +1222,7 @@ class CustomPromptSession:
         self._prompt_buffer_container: ConditionalContainer | None = None
         self._last_ui_state: PromptUIState = PromptUIState.NORMAL_INPUT
         self._suspended_buffer_document: Document | None = None
-        self._activity_pulse_visible = False
+        self._activity_pulse_index = 0
         self._activity_pulse_task: asyncio.Task[Any] | None = None
         clipboard_available = is_clipboard_available()
         media_clipboard_available = is_media_clipboard_available()
@@ -1645,11 +1645,12 @@ class CustomPromptSession:
         status = self._status_provider()
         if status.activity:
             self._ensure_activity_pulse()
-            pulse = " ·" if self._activity_pulse_visible else ""
-            activity_text = f"recap: {status.activity}{pulse}"
+            colors = ["#555555", "#777777", "#999999", "#bbbbbb", "#999999", "#777777"]
+            color = colors[self._activity_pulse_index % len(colors)]
+            activity_text = status.activity
             padding = max(0, (columns - len(activity_text)) // 2)
             centered = " " * padding + activity_text
-            fragments.append(("class:activity-hint", centered))
+            fragments.append((f"fg:{color}", centered))
             fragments.append(("", "\n"))
         else:
             self._cancel_activity_pulse()
@@ -1768,13 +1769,13 @@ class CustomPromptSession:
         if self._activity_pulse_task is not None:
             self._activity_pulse_task.cancel()
             self._activity_pulse_task = None
-        self._activity_pulse_visible = False
+        self._activity_pulse_index = 0
 
     async def _activity_pulse_loop(self) -> None:
-        """Slowly toggle a subtle dot on the activity hint (~0.8 s cycle)."""
+        """Slowly cycle activity-hint color for a breathing effect (~0.8 s step)."""
         while True:
             await asyncio.sleep(0.8)
-            self._activity_pulse_visible = not self._activity_pulse_visible
+            self._activity_pulse_index += 1
             self.invalidate()
 
     def _sync_prompt_ui_state(self) -> None:
@@ -1835,11 +1836,12 @@ class CustomPromptSession:
         status = self._status_provider()
         if status.activity:
             self._ensure_activity_pulse()
-            pulse = " ·" if self._activity_pulse_visible else ""
-            activity_text = f"recap: {status.activity}{pulse}"
+            colors = ["#555555", "#777777", "#999999", "#bbbbbb", "#999999", "#777777"]
+            color = colors[self._activity_pulse_index % len(colors)]
+            activity_text = status.activity
             padding = max(0, (columns - len(activity_text)) // 2)
             centered = " " * padding + activity_text
-            fragments.append(("class:activity-hint", centered))
+            fragments.append((f"fg:{color}", centered))
             fragments.append(("", "\n"))
         else:
             self._cancel_activity_pulse()
