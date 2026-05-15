@@ -853,7 +853,7 @@ class Shell:
             ]
             set_terminal_title(f"{char} {self._format_terminal_title()}")
             self._busy_spinner_index += 1
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.15)
 
     def _stop_busy_spinner(self) -> None:
         """Stop the spinner and restore the static title."""
