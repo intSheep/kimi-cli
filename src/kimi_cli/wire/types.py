@@ -22,7 +22,13 @@ from kosong.tooling import (
     UnknownDisplayBlock,
 )
 from kosong.utils.typing import JsonType
-from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from kimi_cli.tools.display import (
     BackgroundTaskDisplayBlock,
@@ -62,8 +68,6 @@ class TurnEnd(BaseModel):
 
     recap: str | None = None
     """Optional one-line summary of what happened in this turn for UI anchoring."""
-
-    pass
 
 
 class StepBegin(BaseModel):
@@ -647,9 +651,11 @@ class WireMessageEnvelope(BaseModel):
                 typename = name
                 break
         assert typename is not None, f"Unknown wire message type: {type(msg)}"
+        # TurnEnd omits None-valued fields (e.g. recap) to keep payloads compact.
+        exclude_none = isinstance(msg, TurnEnd)
         return cls(
             type=typename,
-            payload=msg.model_dump(mode="json"),
+            payload=msg.model_dump(mode="json", exclude_none=exclude_none),
         )
 
     def to_wire_message(self) -> WireMessage:

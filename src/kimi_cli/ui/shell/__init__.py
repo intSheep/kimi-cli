@@ -866,7 +866,8 @@ class Shell:
                 ).strip()
                 text = text.strip('"').strip("'")
                 return text[:60] if text else None
-            except (APIConnectionError, APITimeoutError, APIStatusError) as e:
+            except (APIConnectionError, APIEmptyResponseError, APITimeoutError,
+                    APIStatusError) as e:
                 last_exc = e
                 if attempt < max_attempts - 1:
                     wait = min(0.5 * (2 ** attempt), 8.0)
@@ -924,7 +925,8 @@ class Shell:
                     part.text for part in result.message.content if isinstance(part, TextPart)
                 ).strip().lower()
                 return text.startswith("yes")
-            except (APIConnectionError, APITimeoutError, APIStatusError) as e:
+            except (APIConnectionError, APIEmptyResponseError, APITimeoutError,
+                    APIStatusError) as e:
                 last_exc = e
                 if attempt < max_attempts - 1:
                     wait = min(0.5 * (2 ** attempt), 8.0)

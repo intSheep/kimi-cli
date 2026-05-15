@@ -52,6 +52,10 @@ class MockChatProvider(ChatProvider):
     def with_thinking(self, effort: ThinkingEffort) -> Self:
         return copy.copy(self)
 
+    def with_generation_kwargs(self, **kwargs) -> Self:
+        """No-op: MockChatProvider ignores generation kwargs."""
+        return copy.copy(self)
+
 
 class MockStreamedMessage(StreamedMessage):
     """The streamed message of the mock chat provider."""

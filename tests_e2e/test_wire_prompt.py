@@ -532,7 +532,7 @@ def test_concurrent_prompt_error(tmp_path) -> None:
                         "mcp_status": None,
                     },
                 },
-                {"method": "event", "type": "TurnEnd", "payload": {}},
+                {"method": "event", "type": "TurnEnd", "payload": {"recap": "recap: Shell"}},
             ]
         )
     finally:

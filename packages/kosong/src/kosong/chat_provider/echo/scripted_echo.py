@@ -67,6 +67,12 @@ class ScriptedEchoChatProvider:
         copied._scripts = deque(self._scripts)
         return copied
 
+    def with_generation_kwargs(self, **kwargs) -> Self:
+        """No-op: ScriptedEchoChatProvider ignores generation kwargs."""
+        copied = copy.copy(self)
+        copied._scripts = deque(self._scripts)
+        return copied
+
 
 class ScriptedEchoStreamedMessage(StreamedMessage):
     """Streamed message for ScriptedEchoChatProvider."""
