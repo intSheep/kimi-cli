@@ -105,7 +105,7 @@ _PROMPT_STYLE_DARK = {
     "bottom-toolbar": "noreverse",
     "running-prompt-placeholder": "fg:#7c8594 italic",
     "running-prompt-separator": "fg:#4a5568",
-    "activity-hint": "fg:#60a5fa italic",
+    "activity-hint": "fg:#6b7280",
     "slash-completion-menu": "",
     "slash-completion-menu.separator": "fg:#4a5568",
     "slash-completion-menu.marker": "fg:#4a5568",
@@ -120,7 +120,7 @@ _PROMPT_STYLE_LIGHT = {
     "bottom-toolbar": "noreverse",
     "running-prompt-placeholder": "fg:#6b7280 italic",
     "running-prompt-separator": "fg:#d1d5db",
-    "activity-hint": "fg:#2563eb italic",
+    "activity-hint": "fg:#9ca3af",
     "slash-completion-menu": "",
     "slash-completion-menu.separator": "fg:#d1d5db",
     "slash-completion-menu.marker": "fg:#9ca3af",
@@ -147,6 +147,7 @@ class ToolbarColors:
     cwd: str
     bg_tasks: str
     mcp: str
+    turn_step: str
     tip: str
 
 
@@ -159,6 +160,7 @@ _TOOLBAR_DARK = ToolbarColors(
     cwd="fg:#666666",
     bg_tasks="fg:#888888",
     mcp="fg:#56a4ff",
+    turn_step="fg:#888888",
     tip="fg:#555555",
 )
 
@@ -171,6 +173,7 @@ _TOOLBAR_LIGHT = ToolbarColors(
     cwd="fg:#6b7280",
     bg_tasks="fg:#4b5563",
     mcp="fg:#1d4ed8",
+    turn_step="fg:#6b7280",
     tip="fg:#9ca3af",
 )
 

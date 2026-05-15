@@ -51,6 +51,7 @@ from kimi_cli.ui.shell.visualize import (
 from kimi_cli.utils.aioqueue import QueueShutDown
 from kimi_cli.utils.envvar import get_env_bool
 from kimi_cli.utils.logging import open_original_stderr
+from kimi_cli.utils.proctitle import set_terminal_title
 from kimi_cli.utils.signals import install_sigint_handler
 from kimi_cli.utils.slashcmd import SlashCommand, SlashCommandCall, parse_slash_command_call
 from kimi_cli.utils.subprocess_env import get_clean_env
@@ -200,6 +201,7 @@ class Shell:
         self._current_prompt_approval_request: ApprovalRequest | None = None
         self._approval_modal: ApprovalPromptDelegate | None = None
         self._exit_after_run = False
+        self._terminal_task_title: str | None = None
         soul_slash_commands = list(soul.available_slash_commands)
         shell_slash_commands = shell_slash_registry.list_commands()
         self._available_slash_commands: dict[str, SlashCommand[Any]] = {
@@ -379,6 +381,7 @@ class Shell:
             await idle_events.put(_PromptEvent(kind="input", user_input=user_input))
 
     async def run(self, command: str | None = None) -> bool:
+        set_terminal_title("Kimi Code")
         _run_start_time = time.monotonic()
 
         # Initialize theme from config
@@ -816,6 +819,117 @@ class Shell:
             console.print(f"[red]Unknown error: {e}[/red]")
             raise  # re-raise unknown error
 
+    def _update_terminal_title(self, view: Any) -> None:
+        """Update the terminal title from the turn recap produced by the latest turn.
+
+        If a task-level title has been set by the LLM, it takes precedence.
+        """
+        if self._terminal_task_title:
+            set_terminal_title(self._terminal_task_title)
+            return
+        recap: str | None = getattr(view, "_turn_recap", None)
+        set_terminal_title(recap if recap else "Kimi Code")
+
+    async def _generate_task_title(self, user_input: str) -> str | None:
+        """Use LLM to generate a ≤10-word title for the user's request."""
+        if not isinstance(self.soul, KimiSoul) or self.soul.runtime.llm is None:
+            return None
+        import kosong
+        from kosong.message import Message, TextPart
+        from kosong.tooling.empty import EmptyToolset
+
+        chat_provider: Any = self.soul.runtime.llm.chat_provider
+        chat_provider = chat_provider.with_generation_kwargs(max_tokens=30)
+        prompt = (
+            f"Summarize the user's request in ≤10 words. "
+            f"Use the same language as the user.\nRequest: {user_input}\nTitle:"
+        )
+        try:
+            result = await kosong.step(
+                chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
+                system_prompt=(
+                    "You are a concise task summarizer. "
+                    "Output only the title, no quotes, no explanation."
+                ),
+                toolset=EmptyToolset(),
+                history=[Message(role="user", content=[TextPart(text=prompt)])],
+            )
+        except Exception:
+            logger.debug("Task title generation failed")
+            return None
+        text = "".join(
+            part.text for part in result.message.content if isinstance(part, TextPart)
+        ).strip()
+        text = text.strip('"').strip("'")
+        return text[:60] if text else None
+
+    async def _is_new_task(self, user_input: str) -> bool:
+        """Use LLM to check whether the user's input starts a new task."""
+        if not isinstance(self.soul, KimiSoul) or self.soul.runtime.llm is None:
+            return False
+        import kosong
+        from kosong.message import Message, TextPart
+        from kosong.tooling.empty import EmptyToolset
+
+        chat_provider: Any = self.soul.runtime.llm.chat_provider
+        chat_provider = chat_provider.with_generation_kwargs(max_tokens=10)
+        prompt = (
+            f'Current task: {self._terminal_task_title or "None"}\n'
+            f"New input: {user_input}\n"
+            f"Is this a completely new, unrelated task? Answer only yes or no."
+        )
+        try:
+            result = await kosong.step(
+                chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
+                system_prompt=(
+                    "You determine if a user input starts a new task. "
+                    "Answer only 'yes' or 'no'."
+                ),
+                toolset=EmptyToolset(),
+                history=[Message(role="user", content=[TextPart(text=prompt)])],
+            )
+        except Exception:
+            logger.debug("New-task detection failed")
+            return False
+        text = "".join(
+            part.text for part in result.message.content if isinstance(part, TextPart)
+        ).strip().lower()
+        return text.startswith("yes")
+
+    async def _maybe_update_terminal_title(self, user_input: str | list[ContentPart]) -> None:
+        """Update the terminal title when a new task is detected."""
+        if not isinstance(user_input, str):
+            return
+        text = user_input.strip()
+        if not text:
+            return
+        # First interaction always generates a title
+        if self._terminal_task_title is None:
+            title = await self._generate_task_title(text)
+            if title:
+                self._terminal_task_title = title
+                set_terminal_title(title)
+            return
+        # Skip very short or obvious follow-up inputs
+        if len(text) < 15 or text.lower() in {
+            "ok",
+            "thanks",
+            "thank you",
+            "ok.",
+            "yes",
+            "no",
+            "好的",
+            "谢谢",
+            "嗯",
+        }:
+            return
+        # Ask LLM whether this is a new task
+        if await self._is_new_task(text):
+            title = await self._generate_task_title(text)
+            if title:
+                self._terminal_task_title = title
+                set_terminal_title(title)
+
     async def run_soul_command(self, user_input: str | list[ContentPart]) -> bool:
         """
         Run the soul and handle any known exceptions.
@@ -843,6 +957,8 @@ class Shell:
         pending: list[UserInput] = []  # queued messages being drained
 
         try:
+            if isinstance(user_input, str):
+                await self._maybe_update_terminal_title(user_input)
             snap = self.soul.status
             runtime = self.soul.runtime if isinstance(self.soul, KimiSoul) else None
             show_thinking_stream = runtime.config.show_thinking_stream if runtime else False
@@ -891,6 +1007,7 @@ class Shell:
             # Clear cancel_event so queued turns aren't tainted by a
             # Ctrl+C that fired during btw dismiss wait.
             cancel_event.clear()
+            self._update_terminal_title(captured_view)
 
             # Drain queued messages and send each as a new turn.
             # Safety valve: cap at 20 "generations" (new batches of messages
@@ -938,6 +1055,7 @@ class Shell:
                 if captured_view is not None:
                     await captured_view.wait_for_btw_dismiss()
                 cancel_event.clear()  # same rationale as above
+                self._update_terminal_title(captured_view)
                 # captured_view is now the view from this turn;
                 # next iteration drains it for any new messages.
             if drain_generation >= _MAX_DRAIN_GENERATIONS:

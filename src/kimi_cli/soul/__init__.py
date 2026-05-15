@@ -100,6 +100,10 @@ class StatusSnapshot:
     """The current MCP startup snapshot, if MCP is configured."""
     activity: str = ""
     """A one-line hint describing what the agent is currently doing."""
+    turn_count: int = 0
+    """The number of completed turns in the current session."""
+    step_count: int = 0
+    """The current step number within the active turn."""
 
 
 @runtime_checkable

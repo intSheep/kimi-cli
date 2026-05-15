@@ -1642,7 +1642,10 @@ class CustomPromptSession:
         # Activity hint in shell mode too
         status = self._status_provider()
         if status.activity:
-            fragments.append(("class:activity-hint", f"{status.activity}"))
+            activity_text = status.activity
+            padding = max(0, (columns - len(activity_text)) // 2)
+            centered = " " * padding + activity_text
+            fragments.append(("class:activity-hint", centered))
             fragments.append(("", "\n"))
         # Shell mode: simple separator + $ prefix (no panel border)
         fragments.append(("class:running-prompt-separator", "─" * max(0, columns)))
@@ -1800,7 +1803,10 @@ class CustomPromptSession:
         # 4. Activity hint — one-line summary of what the agent is doing.
         status = self._status_provider()
         if status.activity:
-            fragments.append(("class:activity-hint", f"{status.activity}"))
+            activity_text = status.activity
+            padding = max(0, (columns - len(activity_text)) // 2)
+            centered = " " * padding + activity_text
+            fragments.append(("class:activity-hint", centered))
             fragments.append(("", "\n"))
 
         # 5. Input section header — style varies by mode:
@@ -2214,6 +2220,14 @@ class CustomPromptSession:
             if remaining >= mcp_width + 2:
                 fragments.extend([(tc.mcp, mcp_text), ("", "  ")])
                 remaining -= mcp_width + 2
+
+        # Turn / Step counters — shown when a turn is active.
+        if status.turn_count > 0:
+            ts_text = f"turn:{status.turn_count} step:{status.step_count}"
+            ts_width = _display_width(ts_text)
+            if remaining >= ts_width + 2:
+                fragments.extend([(tc.turn_step, ts_text), ("", "  ")])
+                remaining -= ts_width + 2
 
         # Tips fill remaining space on line 1
         tip_text = self._get_two_rotating_tips()

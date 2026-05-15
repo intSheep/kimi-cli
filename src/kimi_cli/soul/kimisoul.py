@@ -18,7 +18,8 @@ from kosong.chat_provider import (
     APITimeoutError,
     RetryableChatProvider,
 )
-from kosong.message import Message
+from kosong.message import Message, TextPart
+from kosong.tooling.empty import EmptyToolset
 from tenacity import RetryCallState, retry_if_exception, stop_after_attempt, wait_exponential_jitter
 
 from kimi_cli.approval_runtime import (
@@ -77,7 +78,6 @@ from kimi_cli.wire.types import (
     StepBegin,
     StepInterrupted,
     StepRetry,
-    TextPart,
     ToolResult,
     TurnBegin,
     TurnEnd,
@@ -217,6 +217,11 @@ class KimiSoul:
         self._slash_commands = self._build_slash_commands()
         self._slash_command_map = self._index_slash_commands(self._slash_commands)
         self._activity: str = ""
+        self._cumulative_tool_calls: int = 0
+        self._turn_count: int = 0
+        self._recent_tool_calls: list[str] = []
+        self._current_user_input: str = ""
+        self._current_step_no: int = 0
 
     @property
     def name(self) -> str:
@@ -494,6 +499,8 @@ class KimiSoul:
             max_context_tokens=max_size,
             mcp_status=self._mcp_status_snapshot(),
             activity=self._activity,
+            turn_count=self._turn_count,
+            step_count=self._current_step_no,
         )
 
     @property
@@ -522,6 +529,48 @@ class KimiSoul:
         if not isinstance(self._agent.toolset, KimiToolset):
             return None
         return self._agent.toolset.mcp_status_snapshot()
+
+    async def _generate_activity_llm(self) -> str | None:
+        """Use a lightweight LLM call to summarize what the agent is currently doing.
+
+        Focuses on the ACTION / intent, not the LLM's textual answer to the user.
+        """
+        if self._runtime.llm is None:
+            return None
+        chat_provider: Any = self._runtime.llm.chat_provider
+        chat_provider = chat_provider.with_generation_kwargs(max_tokens=30)
+        recent_tools = (
+            ", ".join(self._recent_tool_calls[-5:]) if self._recent_tool_calls else "none"
+        )
+        prompt = (
+            f"User request: {self._current_user_input}\n"
+            f"Recent tools: {recent_tools}\n\n"
+            f"Summarize what the AI agent is DOING in one short sentence (≤12 words). "
+            f"Focus on the ACTION, not the answer. Use the same language as the user.\n"
+            f"Examples:\n"
+            f'- "hi" → "Greeting the user"\n'
+            f'- "What is this project?" → "Answering the user\'s question"\n'
+            f'- "Refactor auth module" → "Refactoring the auth module"\n'
+            f"Activity:"
+        )
+        try:
+            result = await kosong.step(
+                chat_provider=chat_provider,  # pyright: ignore[reportUnknownArgumentType]
+                system_prompt=(
+                    "You are an activity summarizer for an AI agent. "
+                    "Output only the activity sentence, no quotes, no explanation."
+                ),
+                toolset=EmptyToolset(),
+                history=[Message(role="user", content=[TextPart(text=prompt)])],
+            )
+        except Exception:
+            logger.debug("Activity generation failed")
+            return None
+        text = "".join(
+            part.text for part in result.message.content if isinstance(part, TextPart)
+        ).strip()
+        text = text.strip('"').strip("'")
+        return text[:70] if text else None
 
     def _build_turn_recap(self) -> str | None:
         """Build a one-line recap of the current turn for UI anchoring."""
@@ -645,8 +694,13 @@ class KimiSoul:
 
             wire_send(TurnBegin(user_input=user_input))
             turn_started = True
+            self._turn_count += 1
             self._turn_tool_stats = {}
-            self._activity = "Thinking..."
+            self._cumulative_tool_calls = 0
+            self._recent_tool_calls = []
+            user_message = Message(role="user", content=user_input)
+            self._current_user_input = user_message.extract_text(" ").strip()
+            self._activity = await self._generate_activity_llm() or "Analyzing your request..."
             from kimi_cli.telemetry import track as _track_telemetry
 
             _track_telemetry("turn_started", mode="plan" if self._plan_mode else "agent")
@@ -718,7 +772,8 @@ class KimiSoul:
                             save_session_state(fresh, session.dir)
                         session.state.custom_title = fresh.custom_title
         finally:
-            self._activity = ""
+            # Keep the last activity text visible so users can always see what
+            # the agent was doing, even between turns.
             if turn_started and not turn_finished:
                 wire_send(TurnEnd(recap=None))
                 from kimi_cli.telemetry import track as _track_telemetry
@@ -1156,13 +1211,17 @@ class KimiSoul:
             names = [tc.function.name for tc in result.tool_calls]
             for name in names:
                 self._turn_tool_stats[name] = self._turn_tool_stats.get(name, 0) + 1
-            if len(names) == 1:
-                self._activity = f"Running {names[0]}..."
-            else:
-                self._activity = f"Running {len(names)} tools ({', '.join(names)})..."
+                self._recent_tool_calls.append(name)
+            self._cumulative_tool_calls += len(names)
         results = await result.tool_results()
+        # Update activity based on tool calls (action-oriented, not LLM output text)
         if result.tool_calls:
-            self._activity = "Thinking..."
+            self._activity = "Executing planned actions..."
+        # Every 10 tool calls, ask LLM to re-summarize the current activity
+        if self._cumulative_tool_calls > 0 and self._cumulative_tool_calls % 10 == 0:
+            refreshed = await self._generate_activity_llm()
+            if refreshed:
+                self._activity = refreshed
         logger.debug("Got tool results: {results}", results=results)
 
         # Update dedup tracking for the next step
