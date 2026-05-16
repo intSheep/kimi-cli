@@ -64,6 +64,7 @@ type ChatPromptComposerProps = {
   slashCommands?: SlashCommandDef[];
   planMode?: boolean;
   onPlanModeChange?: (enabled: boolean) => void;
+  onSteer?: (text: string) => void;
   activityStatus?: ActivityDetail;
   usagePercent?: number;
   usedTokens?: number;
@@ -88,6 +89,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
   slashCommands = [],
   planMode = false,
   onPlanModeChange,
+  onSteer,
   activityStatus,
   usagePercent,
   usedTokens,
@@ -200,6 +202,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
         isGitDiffLoading={isGitDiffLoading}
         workDir={currentSession?.workDir}
         planMode={planMode}
+        onSteer={onSteer}
         activityStatus={activityStatus}
         usagePercent={usagePercent}
         usedTokens={usedTokens}

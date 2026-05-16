@@ -55,6 +55,10 @@ type ChatWorkspaceProps = {
   tokenUsage?: TokenUsage | null;
   /** Current streaming tokens per second (estimated) */
   tokensPerSecond?: number;
+  /** Current terminal title set by the agent */
+  terminalTitle?: string;
+  /** Current activity hint set by the agent */
+  activityHint?: string;
   /** Current step number */
   currentStep?: number;
   /** Current session configuration */
@@ -92,6 +96,8 @@ type ChatWorkspaceProps = {
   maxContextSize?: number;
   /** Fork session at a specific turn */
   onForkSession?: (turnIndex: number) => void;
+  /** Steer the current running turn with additional input */
+  onSteer?: (text: string) => void;
   /** Error message from the session stream */
   errorMessage?: string;
 };
@@ -109,6 +115,8 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
   contextUsage = 0,
   tokenUsage = null,
   tokensPerSecond = 0,
+  terminalTitle = "",
+  activityHint = "",
   currentStep = 0,
   currentSession,
   isReplayingHistory = false,
@@ -126,6 +134,7 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
   planMode = false,
   onPlanModeChange,
   onForkSession,
+  onSteer,
   errorMessage,
 }: ChatWorkspaceProps): ReactElement {
   const [blocksExpanded, setBlocksExpanded] = useState(false);
@@ -282,6 +291,8 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
         <ChatWorkspaceHeader
           currentStep={currentStep}
           sessionDescription={sessionDescription}
+          terminalTitle={terminalTitle}
+          activityHint={activityHint}
           currentSession={currentSession}
           selectedSessionId={selectedSessionId}
           isFilesPanelOpen={isFilesPanelOpen}
@@ -348,6 +359,7 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
                       slashCommands={slashCommands}
                       planMode={planMode}
                       onPlanModeChange={onPlanModeChange}
+                      onSteer={onSteer}
                       activityStatus={activityStatus}
                       usagePercent={usagePercent}
                       usedTokens={usedTokens}

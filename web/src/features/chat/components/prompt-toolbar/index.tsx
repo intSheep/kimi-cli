@@ -32,6 +32,7 @@ type PromptToolbarProps = {
   maxTokens?: number;
   tokenUsage?: TokenUsage | null;
   tokensPerSecond?: number;
+  onSteer?: (text: string) => void;
 };
 
 // ─── Main toolbar ────────────────────────────────────────────
@@ -47,6 +48,7 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
   maxTokens,
   tokenUsage,
   tokensPerSecond,
+  onSteer,
 }: PromptToolbarProps): ReactElement | null {
   const queue = useQueueStore((s) => s.queue);
   const todoItems = useToolEventsStore((s) => s.todoItems);
@@ -89,7 +91,7 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
           "rounded-md border border-border bg-background",
           activeTab !== "changes" && "max-h-32 overflow-y-auto py-1 px-0.5",
         )}>
-          {activeTab === "queue" && <ToolbarQueuePanel queue={queue} />}
+          {activeTab === "queue" && <ToolbarQueuePanel queue={queue} onSteer={onSteer} />}
           {activeTab === "changes" && stats && (
             <ToolbarChangesPanel stats={stats} workDir={workDir} />
           )}

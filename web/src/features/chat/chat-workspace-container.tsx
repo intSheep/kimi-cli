@@ -120,11 +120,14 @@ export function ChatWorkspaceContainer({
     contextUsage,
     tokenUsage,
     tokensPerSecond,
+    terminalTitle,
+    activityHint,
     currentStep,
     isConnected: isStreamConnected,
     isReplayingHistory,
     planMode,
     sendSetPlanMode,
+    steer,
     slashCommands,
     error: streamError,
   } = sessionStream;
@@ -377,6 +380,8 @@ export function ChatWorkspaceContainer({
       maxContextSize={maxContextSize}
       tokenUsage={tokenUsage}
       tokensPerSecond={tokensPerSecond}
+      terminalTitle={terminalTitle}
+      activityHint={activityHint}
       currentStep={currentStep}
       currentSession={currentSession}
       isReplayingHistory={isReplayingHistory}
@@ -391,6 +396,7 @@ export function ChatWorkspaceContainer({
       onPlanModeChange={handlePlanModeChange}
       errorMessage={streamError?.message}
       onForkSession={onForkSession ? handleForkSession : undefined}
+      onSteer={steer}
     />
   );
 }

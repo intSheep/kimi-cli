@@ -261,6 +261,10 @@ type UseSessionStreamReturn = {
   tokenUsage: TokenUsage | null;
   /** Current streaming tokens per second (estimated) */
   tokensPerSecond: number;
+  /** Current terminal title set by the agent */
+  terminalTitle: string;
+  /** Current activity hint set by the agent */
+  activityHint: string;
   /** Current step number */
   currentStep: number;
   /** Whether connected to the session stream */
@@ -296,6 +300,8 @@ type UseSessionStreamReturn = {
   planMode: boolean;
   /** Set plan mode via silent RPC (no context message) */
   sendSetPlanMode: (enabled: boolean) => void;
+  /** Steer the current running turn with additional input */
+  steer: (text: string) => void;
   /** Available slash commands from the server */
   slashCommands: SlashCommandDef[];
 };
@@ -340,6 +346,8 @@ export function useSessionStream(
   const [contextUsage, setContextUsage] = useState(0);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
   const [tokensPerSecond, setTokensPerSecond] = useState(0);
+  const [terminalTitle, setTerminalTitle] = useState("");
+  const [activityHint, setActivityHint] = useState("");
   const [planMode, setPlanMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
@@ -1030,6 +1038,8 @@ export function useSessionStream(
     setContextUsage(0);
     setTokenUsage(null);
     setTokensPerSecond(0);
+    setTerminalTitle("");
+    setActivityHint("");
     setPlanMode(false);
     setError(null);
     setSessionStatus(null);
@@ -1956,6 +1966,16 @@ export function useSessionStream(
           const nextPlanMode = event.payload.plan_mode;
           if (typeof nextPlanMode === "boolean") {
             setPlanMode(nextPlanMode);
+          }
+
+          const nextTitle = event.payload.title;
+          if (typeof nextTitle === "string") {
+            setTerminalTitle(nextTitle);
+          }
+
+          const nextActivity = event.payload.activity;
+          if (typeof nextActivity === "string") {
+            setActivityHint(nextActivity);
           }
 
           // If we have a message_id, create a special message to display it
@@ -3069,6 +3089,22 @@ export function useSessionStream(
     wsRef.current.send(JSON.stringify(message));
   }, []);
 
+  // Steer the current running turn with additional input
+  const steer = useCallback((text: string) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    const trimmedText = text.trim();
+    if (!trimmedText) return;
+    const message: JsonRpcRequest = {
+      jsonrpc: "2.0",
+      method: "steer",
+      id: uuidV4(),
+      params: { user_input: trimmedText },
+    };
+    wsRef.current.send(JSON.stringify(message));
+  }, []);
+
   // Auto-connect when sessionId changes
   useLayoutEffect(() => {
     /**
@@ -3139,6 +3175,8 @@ export function useSessionStream(
     contextUsage,
     tokenUsage,
     tokensPerSecond,
+    terminalTitle,
+    activityHint,
     currentStep,
     isConnected,
     isReplayingHistory,
@@ -3154,6 +3192,7 @@ export function useSessionStream(
     error,
     planMode,
     sendSetPlanMode,
+    steer,
     slashCommands,
   };
 }
