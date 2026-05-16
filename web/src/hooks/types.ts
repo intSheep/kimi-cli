@@ -138,6 +138,10 @@ export type LiveMessage = {
     /** True when this tool message was created from a sub-agent's ApprovalRequest
      *  (the tool_call_id belongs to the sub-agent, not the main agent) */
     isSubagentOrigin?: boolean;
+    /** Timestamp (performance.now) when the tool call started */
+    startTime?: number;
+    /** Duration in milliseconds from start to completion */
+    duration?: number;
   };
   codeSnippet?: {
     title: string;

@@ -1452,6 +1452,7 @@ export function useSessionStream(
               state: "input-streaming" as ToolUIPart["state"],
               toolCallId: toolCall.id,
               input: parsedInput,
+              startTime: performance.now(),
             },
             isStreaming: !isReplay,
           });
@@ -1571,6 +1572,9 @@ export function useSessionStream(
           setMessages((prev) =>
             prev.map((msg) => {
               if (msg.toolCall?.toolCallId !== tool_call_id) return msg;
+              const duration = msg.toolCall?.startTime
+                ? Math.round(performance.now() - msg.toolCall.startTime)
+                : undefined;
               return {
                 ...msg,
                 toolCall: {
@@ -1592,6 +1596,7 @@ export function useSessionStream(
                   subagentRunning: msg.toolCall.subagentSteps
                     ? false
                     : msg.toolCall.subagentRunning,
+                  duration,
                 },
                 isStreaming: false,
               };

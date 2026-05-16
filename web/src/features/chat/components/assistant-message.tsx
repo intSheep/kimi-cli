@@ -221,6 +221,8 @@ const renderToolMessage = ({
           title={toolCall.title}
           type={toolCall.type}
           input={toolCall.input}
+          startTime={toolCall.startTime}
+          duration={toolCall.duration}
         />
         <ToolContent>
           {toolCall.input ? <ToolInput input={toolCall.input} /> : null}

@@ -11,6 +11,7 @@ import {
   ChevronDownIcon,
   ListOrderedIcon,
   PencilIcon,
+  SendIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
@@ -25,7 +26,7 @@ import { useQueueStore, type QueuedItem } from "../../queue-store";
 
 // ─── Sub-components ──────────────────────────────────────────
 
-function QueueItemRow({ item, isFirst, onEdit }: { item: QueuedItem; isFirst: boolean; onEdit: (id: string) => void }): ReactElement {
+function QueueItemRow({ item, isFirst, onEdit, onSteer }: { item: QueuedItem; isFirst: boolean; onEdit: (id: string) => void; onSteer: (text: string) => void }): ReactElement {
   const removeFromQueue = useQueueStore((s) => s.removeFromQueue);
   const moveQueueItemUp = useQueueStore((s) => s.moveQueueItemUp);
 
@@ -35,6 +36,14 @@ function QueueItemRow({ item, isFirst, onEdit }: { item: QueuedItem; isFirst: bo
         {item.text}
       </p>
       <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="size-5 text-muted-foreground hover:text-foreground" onClick={() => { removeFromQueue(item.id); onSteer(item.text); }}>
+              <SendIcon className="size-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Send now</TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon-sm" className="size-5" onClick={() => onEdit(item.id)}>
@@ -104,10 +113,12 @@ function EditingItemRow({ item, onDone }: { item: QueuedItem; onDone: () => void
 
 type ToolbarQueuePanelProps = {
   queue: QueuedItem[];
+  onSteer?: (text: string) => void;
 };
 
 export const ToolbarQueuePanel = memo(function ToolbarQueuePanelComponent({
   queue,
+  onSteer,
 }: ToolbarQueuePanelProps): ReactElement {
   const [editingId, setEditingId] = useState<string | null>(null);
   const handleEditDone = useCallback(() => setEditingId(null), []);
@@ -118,7 +129,7 @@ export const ToolbarQueuePanel = memo(function ToolbarQueuePanelComponent({
         editingId === item.id ? (
           <EditingItemRow key={item.id} item={item} onDone={handleEditDone} />
         ) : (
-          <QueueItemRow key={item.id} item={item} isFirst={idx === 0} onEdit={setEditingId} />
+          <QueueItemRow key={item.id} item={item} isFirst={idx === 0} onEdit={setEditingId} onSteer={onSteer ?? (() => undefined)} />
         ),
       )}
     </>
