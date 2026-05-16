@@ -296,7 +296,6 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
           sessionDescription={sessionDescription}
           terminalTitle={terminalTitle}
           activityHint={activityHint}
-          mcpStatus={mcpStatus}
           currentSession={currentSession}
           selectedSessionId={selectedSessionId}
           isFilesPanelOpen={isFilesPanelOpen}
@@ -370,6 +369,7 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
                       maxTokens={maxTokens}
                       tokenUsage={tokenUsage}
                       tokensPerSecond={tokensPerSecond}
+                      mcpStatus={mcpStatus}
                     />
                   </div>
                 )}

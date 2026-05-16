@@ -25,7 +25,6 @@ type ChatWorkspaceHeaderProps = {
   sessionDescription?: string;
   terminalTitle?: string;
   activityHint?: string;
-  mcpStatus?: { loading: boolean; connected: number; total: number; tools: number } | null;
   currentSession?: Session;
   selectedSessionId?: string;
   isFilesPanelOpen?: boolean;
@@ -42,7 +41,6 @@ export function ChatWorkspaceHeader({
   sessionDescription,
   terminalTitle,
   activityHint,
-  mcpStatus,
   currentSession,
   selectedSessionId,
   isFilesPanelOpen = false,
@@ -141,11 +139,9 @@ export function ChatWorkspaceHeader({
               </TooltipContent>
             </Tooltip>
           ) : null}
-          {!isEditing && (
+          {!isEditing && (terminalTitle || activityHint) && (
             <p className="truncate text-[11px] text-muted-foreground">
-              {mcpStatus?.loading
-                ? `MCP ${mcpStatus.connected}/${mcpStatus.total} connected`
-                : terminalTitle || activityHint || ""}
+              {terminalTitle || activityHint}
             </p>
           )}
         </div>

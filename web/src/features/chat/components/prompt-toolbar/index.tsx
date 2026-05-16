@@ -32,6 +32,7 @@ type PromptToolbarProps = {
   maxTokens?: number;
   tokenUsage?: TokenUsage | null;
   tokensPerSecond?: number;
+  mcpStatus?: { loading: boolean; connected: number; total: number; tools: number } | null;
   onSteer?: (text: string) => void;
 };
 
@@ -48,6 +49,7 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
   maxTokens,
   tokenUsage,
   tokensPerSecond,
+  mcpStatus,
   onSteer,
 }: PromptToolbarProps): ReactElement | null {
   const queue = useQueueStore((s) => s.queue);
@@ -110,6 +112,12 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
         {tokensPerSecond && tokensPerSecond > 0 && (
           <span className="flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent text-muted-foreground select-none">
             {tokensPerSecond} tok/s
+          </span>
+        )}
+
+        {mcpStatus?.loading && (
+          <span className="flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent text-primary select-none">
+            mcp {mcpStatus.connected}/{mcpStatus.total}
           </span>
         )}
 
