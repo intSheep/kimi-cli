@@ -116,87 +116,93 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
 
       {/* ── Tab bar ── */}
       <div className="flex items-center gap-1.5 px-1">
-{activityStatus && (
-          <ToolbarActivityIndicator activity={activityStatus} />
-        )}
+        {/* Left: activity / streaming stats / tabs */}
+        <div className="flex items-center gap-1.5">
+          {activityStatus && (
+            <ToolbarActivityIndicator activity={activityStatus} />
+          )}
 
-        {tokensPerSecond && tokensPerSecond > 0 && (
-          <span className="flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent text-muted-foreground select-none">
-            {tokensPerSecond} tok/s
-          </span>
-        )}
+          {tokensPerSecond && tokensPerSecond > 0 && (
+            <span className="flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent text-muted-foreground select-none">
+              {tokensPerSecond} tok/s
+            </span>
+          )}
 
-        {mcpStatus && mcpStatus.total > 0 && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                className={cn(
-                  "flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent select-none cursor-help",
-                  mcpStatus.loading ? "text-primary" : "text-muted-foreground",
-                )}
-              >
-                mcp {mcpStatus.connected}/{mcpStatus.total}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs">
-              <div className="space-y-1">
-                {mcpStatus.servers.map((s) => (
-                  <div key={s.name} className="flex items-center gap-2 text-xs">
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full shrink-0",
-                        s.status === "connected" && "bg-success",
-                        s.status === "connecting" && "bg-warning animate-pulse",
-                        s.status === "failed" && "bg-destructive",
-                        s.status === "unauthorized" && "bg-muted-foreground",
-                        s.status === "pending" && "bg-muted-foreground/50",
+          {mcpStatus && mcpStatus.total > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className={cn(
+                    "flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent select-none cursor-help",
+                    mcpStatus.loading ? "text-primary" : "text-muted-foreground",
+                  )}
+                >
+                  mcp {mcpStatus.connected}/{mcpStatus.total}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <div className="space-y-1">
+                  {mcpStatus.servers.map((s) => (
+                    <div key={s.name} className="flex items-center gap-2 text-xs">
+                      <span
+                        className={cn(
+                          "size-1.5 rounded-full shrink-0",
+                          s.status === "connected" && "bg-success",
+                          s.status === "connecting" && "bg-warning animate-pulse",
+                          s.status === "failed" && "bg-destructive",
+                          s.status === "unauthorized" && "bg-muted-foreground",
+                          s.status === "pending" && "bg-muted-foreground/50",
+                        )}
+                      />
+                      <span className="font-medium">{s.name}</span>
+                      <span className="text-muted-foreground capitalize">{s.status}</span>
+                      {s.error && (
+                        <span className="text-destructive truncate max-w-[120px]" title={s.error}>
+                          {s.error}
+                        </span>
                       )}
-                    />
-                    <span className="font-medium">{s.name}</span>
-                    <span className="text-muted-foreground capitalize">{s.status}</span>
-                    {s.error && (
-                      <span className="text-destructive truncate max-w-[120px]" title={s.error}>
-                        {s.error}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        )}
+                    </div>
+                  ))}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          )}
 
-        {hasQueue && (
-          <ToolbarQueueTab
-            count={queue.length}
-            isActive={activeTab === "queue"}
-            onToggle={() => toggleTab("queue")}
-          />
-        )}
+          {hasQueue && (
+            <ToolbarQueueTab
+              count={queue.length}
+              isActive={activeTab === "queue"}
+              onToggle={() => toggleTab("queue")}
+            />
+          )}
 
-        {hasChanges && stats?.files && (
-          <ToolbarChangesTab
-            stats={stats}
-            isActive={activeTab === "changes"}
-            onToggle={() => toggleTab("changes")}
-          />
-        )}
+          {hasChanges && stats?.files && (
+            <ToolbarChangesTab
+              stats={stats}
+              isActive={activeTab === "changes"}
+              onToggle={() => toggleTab("changes")}
+            />
+          )}
 
-        {hasTodo && (
-          <ToolbarTodoTab
-            items={todoItems}
-            isActive={activeTab === "todo"}
-            onToggle={() => toggleTab("todo")}
-          />
-        )}
+          {hasTodo && (
+            <ToolbarTodoTab
+              items={todoItems}
+              isActive={activeTab === "todo"}
+              onToggle={() => toggleTab("todo")}
+            />
+          )}
+        </div>
 
+        {/* Spacer pushes context indicator to the far right */}
+        <div className="flex-1" />
+
+        {/* Right: context / token usage — always at the end */}
         {hasContext && (
           <ToolbarContextIndicator
             usagePercent={usagePercent!}
             usedTokens={usedTokens!}
             maxTokens={maxTokens!}
             tokenUsage={tokenUsage ?? null}
-            className="ml-auto"
           />
         )}
       </div>
