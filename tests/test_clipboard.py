@@ -12,7 +12,6 @@ from kimi_cli.utils.clipboard import (
     _grab_image_linux,
     _grab_image_wsl,
     is_media_clipboard_available,
-    is_wsl,
 )
 
 

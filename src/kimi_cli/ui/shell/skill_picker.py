@@ -33,6 +33,7 @@ def _scope_label(scope: str) -> str:
 # SkillMenuApp
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class SkillMenuApp:
     """Main menu: choose between listing/running skills and managing enablement."""
 
@@ -160,6 +161,7 @@ class SkillMenuApp:
 # ═══════════════════════════════════════════════════════════════════════════════
 # SkillListApp
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class SkillListApp:
     """Full-screen skill list for selecting a skill to run."""
@@ -320,6 +322,7 @@ class SkillListApp:
 # ═══════════════════════════════════════════════════════════════════════════════
 # SkillEnableApp
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class SkillEnableApp:
     """Full-screen skill picker with space-to-toggle and escape-to-exit."""

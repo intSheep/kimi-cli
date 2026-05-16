@@ -170,7 +170,7 @@ def test_build_toolbar_tips_with_clipboard_wsl(monkeypatch) -> None:
         "ctrl-j: newline",
         "/feedback: send feedback",
         "/theme: switch dark/light",
-        "alt-v: paste clipboard",
+        "f5: paste clipboard",
         "@: mention files",
     ]
 
