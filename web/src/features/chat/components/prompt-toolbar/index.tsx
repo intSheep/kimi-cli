@@ -16,6 +16,11 @@ import { ToolbarQueuePanel, ToolbarQueueTab } from "./toolbar-queue";
 import { ToolbarChangesPanel, ToolbarChangesTab } from "./toolbar-changes";
 import { ToolbarTodoPanel, ToolbarTodoTab } from "./toolbar-todo";
 import { ToolbarContextIndicator } from "./toolbar-context";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -32,7 +37,13 @@ type PromptToolbarProps = {
   maxTokens?: number;
   tokenUsage?: TokenUsage | null;
   tokensPerSecond?: number;
-  mcpStatus?: { loading: boolean; connected: number; total: number; tools: number } | null;
+  mcpStatus?: {
+    loading: boolean;
+    connected: number;
+    total: number;
+    tools: number;
+    servers: { name: string; status: string; error?: string | null }[];
+  } | null;
   onSteer?: (text: string) => void;
 };
 
@@ -116,9 +127,38 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
         )}
 
         {mcpStatus?.loading && (
-          <span className="flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent text-primary select-none">
-            mcp {mcpStatus.connected}/{mcpStatus.total}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent text-primary select-none cursor-help">
+                mcp {mcpStatus.connected}/{mcpStatus.total}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              <div className="space-y-1">
+                {mcpStatus.servers.map((s) => (
+                  <div key={s.name} className="flex items-center gap-2 text-xs">
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full shrink-0",
+                        s.status === "connected" && "bg-success",
+                        s.status === "connecting" && "bg-warning animate-pulse",
+                        s.status === "failed" && "bg-destructive",
+                        s.status === "unauthorized" && "bg-muted-foreground",
+                        s.status === "pending" && "bg-muted-foreground/50",
+                      )}
+                    />
+                    <span className="font-medium">{s.name}</span>
+                    <span className="text-muted-foreground capitalize">{s.status}</span>
+                    {s.error && (
+                      <span className="text-destructive truncate max-w-[120px]" title={s.error}>
+                        {s.error}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {hasQueue && (
