@@ -375,6 +375,31 @@ body {
       box-shadow: 0 0 12px rgba(59, 130, 246, 0.8);
     }
   }
+
+  /* Session status indicator animations */
+  @keyframes orbit {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes draw-check {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes ripple-drop {
+    0% { transform: scale(0.4); opacity: 0.7; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .session-orbit,
+    .session-ripple {
+      animation: none !important;
+    }
+    .session-draw-check {
+      stroke-dashoffset: 0 !important;
+    }
+  }
 }
 
 /* View Transitions: Theme Toggle Animation */

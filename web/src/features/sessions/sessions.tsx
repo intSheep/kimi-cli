@@ -97,21 +97,81 @@ function shortenPath(path: string, maxLen = 30): string {
   return ".../" + parts.slice(-2).join("/");
 }
 
-/**
- * Returns subtle background classes for a session based on its lifecycle phase.
- * Working sessions get a gentle green tint with a breathing animation;
- * need_input gets a soft amber; completed gets a soft blue.
- */
-function getSessionPhaseClasses(phase?: string | null): string {
+/** Working — orbiting satellites around a core, alive and kinetic */
+function WorkingIndicator(): ReactElement {
+  return (
+    <div className="relative size-4 shrink-0">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="size-[5px] rounded-full bg-emerald-500" />
+      </div>
+      <div
+        className="absolute inset-0 session-orbit"
+        style={{ animation: "orbit 2s linear infinite" }}
+      >
+        <div className="absolute top-[1px] left-1/2 -translate-x-1/2 size-[3px] rounded-full bg-emerald-400/80" />
+      </div>
+      <div
+        className="absolute inset-0 session-orbit"
+        style={{ animation: "orbit 1.2s linear infinite reverse" }}
+      >
+        <div className="absolute bottom-[2px] left-1/2 -translate-x-1/2 size-[2px] rounded-full bg-emerald-300/60" />
+      </div>
+    </div>
+  );
+}
+
+/** Completed — hand-drawn checkmark animates in */
+function CompletedIndicator(): ReactElement {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
+      <path
+        d="M4 8.5 L7 11.5 L12.5 5"
+        stroke="#10b981"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="session-draw-check"
+        style={{
+          strokeDasharray: 14,
+          strokeDashoffset: 14,
+          animation: "draw-check 0.4s ease-out 0.1s forwards",
+        }}
+      />
+    </svg>
+  );
+}
+
+/** Need input — ripple drop waiting for your response */
+function NeedInputIndicator(): ReactElement {
+  return (
+    <div className="relative size-4 shrink-0 flex items-center justify-center">
+      <div className="size-[5px] rounded-full bg-amber-400 relative z-10" />
+      <div
+        className="absolute inset-0 flex items-center justify-center session-ripple"
+        style={{ animation: "ripple-drop 2s ease-out infinite" }}
+      >
+        <div className="size-full rounded-full border border-amber-400/40" />
+      </div>
+      <div
+        className="absolute inset-0 flex items-center justify-center session-ripple"
+        style={{ animation: "ripple-drop 2s ease-out 0.6s infinite" }}
+      >
+        <div className="size-full rounded-full border border-amber-400/30" />
+      </div>
+    </div>
+  );
+}
+
+function SessionStatusIndicator({ phase }: { phase?: string | null }): ReactElement | null {
   switch (phase) {
     case "working":
-      return "bg-emerald-50/50 dark:bg-emerald-950/15 session-breathe";
-    case "need_input":
-      return "bg-amber-50/50 dark:bg-amber-950/15";
+      return <WorkingIndicator />;
     case "completed":
-      return "bg-sky-50/50 dark:bg-sky-950/15";
+      return <CompletedIndicator />;
+    case "need_input":
+      return <NeedInputIndicator />;
     default:
-      return "";
+      return null;
   }
 }
 
@@ -971,7 +1031,7 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                                             "flex-1 min-w-0 cursor-pointer text-left rounded-lg px-3 py-2 transition-colors",
                                             isActive
                                               ? "bg-secondary"
-                                              : getSessionPhaseClasses(session.status?.phase) || "hover:bg-secondary/60"
+                                              : "hover:bg-secondary/60"
                                           )}
                                           onClick={() => !isEditing && onSelectSession(session.id)}
                                           onContextMenu={(event) =>
@@ -1000,6 +1060,7 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                                             />
                                           ) : (
                                             <div className="flex items-center gap-1.5">
+                                              <SessionStatusIndicator phase={session.status?.phase} />
                                               <Tooltip delayDuration={500}>
                                                 <TooltipTrigger asChild>
                                                   <p className="text-sm font-medium text-foreground truncate">
@@ -1122,6 +1183,7 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                           />
                         ) : (
                           <div className="flex items-center gap-2">
+                            <SessionStatusIndicator phase={session.status?.phase} />
                             <Tooltip delayDuration={500}>
                               <TooltipTrigger asChild>
                                 <p className="text-sm font-medium text-foreground truncate flex-1">
