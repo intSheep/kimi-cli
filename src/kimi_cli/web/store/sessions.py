@@ -245,9 +245,7 @@ def infer_session_phase_from_wire(session_dir: Path) -> SessionPhase:
     return "created"
 
 
-def build_session_status_for_stopped_session(
-    session_dir: Path, session_id: UUID
-) -> SessionStatus:
+def build_session_status_for_stopped_session(session_dir: Path, session_id: UUID) -> SessionStatus:
     """Build a synthetic SessionStatus for a stopped session."""
     phase = infer_session_phase_from_wire(session_dir)
     return SessionStatus(
