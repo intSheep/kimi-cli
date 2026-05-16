@@ -343,6 +343,7 @@ function App() {
         updatedAt: formatRelativeTime(session.lastUpdated),
         workDir: session.workDir,
         lastUpdated: session.lastUpdated,
+        status: session.status,
       })),
     [sessions],
   );
@@ -356,6 +357,7 @@ function App() {
         updatedAt: formatRelativeTime(session.lastUpdated),
         workDir: session.workDir,
         lastUpdated: session.lastUpdated,
+        status: session.status,
       })),
     [archivedSessions],
   );

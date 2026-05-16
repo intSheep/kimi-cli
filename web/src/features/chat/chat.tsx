@@ -59,6 +59,8 @@ type ChatWorkspaceProps = {
   terminalTitle?: string;
   /** Current activity hint set by the agent */
   activityHint?: string;
+  /** Current MCP loading status snapshot */
+  mcpStatus?: { loading: boolean; connected: number; total: number; tools: number } | null;
   /** Current step number */
   currentStep?: number;
   /** Current session configuration */
@@ -117,6 +119,7 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
   tokensPerSecond = 0,
   terminalTitle = "",
   activityHint = "",
+  mcpStatus = null,
   currentStep = 0,
   currentSession,
   isReplayingHistory = false,
@@ -293,6 +296,7 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
           sessionDescription={sessionDescription}
           terminalTitle={terminalTitle}
           activityHint={activityHint}
+          mcpStatus={mcpStatus}
           currentSession={currentSession}
           selectedSessionId={selectedSessionId}
           isFilesPanelOpen={isFilesPanelOpen}

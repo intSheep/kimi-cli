@@ -18,7 +18,9 @@ This design works well when:
 
 from __future__ import annotations
 
+import json
 import time
+from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -29,7 +31,7 @@ from pydantic import ConfigDict, Field
 from kimi_cli.metadata import WorkDirMeta, load_metadata
 from kimi_cli.session import Session as KimiCLISession
 from kimi_cli.session_state import SessionState, load_session_state, save_session_state
-from kimi_cli.web.models import Session
+from kimi_cli.web.models import Session, SessionPhase, SessionStatus
 from kimi_cli.wire.file import WireFile
 
 # Cache configuration
@@ -162,6 +164,101 @@ def _build_kimi_session(entry: SessionIndexEntry) -> KimiCLISession:
         state=entry.state,
         title=entry.title,
         updated_at=entry.last_updated.timestamp(),
+    )
+
+
+def _tail_lines(path: Path, n: int) -> list[str]:
+    """Return the last n lines from a text file."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return list(deque(f, maxlen=n))
+    except OSError:
+        return []
+
+
+_WIRE_SCAN_TAIL_LINES = 200
+
+
+def infer_session_phase_from_wire(session_dir: Path) -> SessionPhase:
+    """Infer session phase by scanning the tail of wire.jsonl.
+
+    This is used for stopped sessions where no SessionProcess is alive
+    to track state in memory.
+    """
+    wire_file = session_dir / "wire.jsonl"
+    if not wire_file.exists():
+        return "created"
+
+    turn_active = False
+    has_history = False
+    last_turn_event_is_end = False
+    pending_approvals: set[str] = set()
+    pending_questions: set[str] = set()
+
+    for line in _tail_lines(wire_file, _WIRE_SCAN_TAIL_LINES):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+            if record.get("type") == "metadata":
+                continue
+            msg = record.get("message", {})
+            msg_type = msg.get("type")
+            payload = msg.get("payload", {})
+
+            match msg_type:
+                case "TurnBegin":
+                    turn_active = True
+                    has_history = True
+                    last_turn_event_is_end = False
+                case "TurnEnd":
+                    turn_active = False
+                    last_turn_event_is_end = True
+                case "ApprovalRequest":
+                    req_id = payload.get("id")
+                    if req_id:
+                        pending_approvals.add(req_id)
+                case "ApprovalResponse":
+                    req_id = payload.get("request_id")
+                    if req_id:
+                        pending_approvals.discard(req_id)
+                case "QuestionRequest":
+                    req_id = payload.get("id")
+                    if req_id:
+                        pending_questions.add(req_id)
+                # Note: QuestionResponse is not persisted to wire.jsonl,
+                # so we rely on last_turn_event_is_end to disambiguate.
+                case _:
+                    pass
+        except (json.JSONDecodeError, AttributeError, TypeError):
+            continue
+
+    if turn_active:
+        return "working"
+    if pending_approvals:
+        return "need_input"
+    if pending_questions and not last_turn_event_is_end:
+        return "need_input"
+    if has_history:
+        return "completed"
+    return "created"
+
+
+def build_session_status_for_stopped_session(
+    session_dir: Path, session_id: UUID
+) -> SessionStatus:
+    """Build a synthetic SessionStatus for a stopped session."""
+    phase = infer_session_phase_from_wire(session_dir)
+    return SessionStatus(
+        session_id=session_id,
+        state="stopped",
+        phase=phase,
+        seq=0,
+        worker_id=None,
+        reason=None,
+        detail=None,
+        updated_at=datetime.now(UTC),
     )
 
 

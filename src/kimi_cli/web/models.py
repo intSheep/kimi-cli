@@ -10,12 +10,17 @@ from pydantic import BaseModel, Field
 
 SessionState = Literal["stopped", "idle", "busy", "restarting", "error"]
 
+SessionPhase = Literal["created", "working", "need_input", "completed"]
+
 
 class SessionStatus(BaseModel):
     """Runtime status of a web session."""
 
     session_id: UUID = Field(..., description="Session unique ID")
     state: SessionState = Field(..., description="Current session state")
+    phase: SessionPhase = Field(
+        default="created", description="User-facing session lifecycle phase"
+    )
     seq: int = Field(..., description="Monotonic sequence number")
     worker_id: str | None = Field(default=None, description="Worker instance ID")
     reason: str | None = Field(default=None, description="Reason for the state transition")

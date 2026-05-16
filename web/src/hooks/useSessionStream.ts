@@ -265,6 +265,8 @@ type UseSessionStreamReturn = {
   terminalTitle: string;
   /** Current activity hint set by the agent */
   activityHint: string;
+  /** Current MCP loading status snapshot */
+  mcpStatus: { loading: boolean; connected: number; total: number; tools: number } | null;
   /** Current step number */
   currentStep: number;
   /** Whether connected to the session stream */
@@ -348,6 +350,12 @@ export function useSessionStream(
   const [tokensPerSecond, setTokensPerSecond] = useState(0);
   const [terminalTitle, setTerminalTitle] = useState("");
   const [activityHint, setActivityHint] = useState("");
+  const [mcpStatus, setMcpStatus] = useState<{
+    loading: boolean;
+    connected: number;
+    total: number;
+    tools: number;
+  } | null>(null);
   const [planMode, setPlanMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
@@ -1040,6 +1048,7 @@ export function useSessionStream(
     setTokensPerSecond(0);
     setTerminalTitle("");
     setActivityHint("");
+    setMcpStatus(null);
     setPlanMode(false);
     setError(null);
     setSessionStatus(null);
@@ -1981,6 +1990,16 @@ export function useSessionStream(
           const nextActivity = event.payload.activity;
           if (typeof nextActivity === "string") {
             setActivityHint(nextActivity);
+          }
+
+          const nextMcpStatus = event.payload.mcp_status;
+          if (nextMcpStatus) {
+            setMcpStatus({
+              loading: nextMcpStatus.loading,
+              connected: nextMcpStatus.connected,
+              total: nextMcpStatus.total,
+              tools: nextMcpStatus.tools,
+            });
           }
 
           // If we have a message_id, create a special message to display it
@@ -3182,6 +3201,7 @@ export function useSessionStream(
     tokensPerSecond,
     terminalTitle,
     activityHint,
+    mcpStatus,
     currentStep,
     isConnected,
     isReplayingHistory,

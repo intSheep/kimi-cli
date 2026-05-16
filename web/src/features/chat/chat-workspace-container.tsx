@@ -122,6 +122,7 @@ export function ChatWorkspaceContainer({
     tokensPerSecond,
     terminalTitle,
     activityHint,
+    mcpStatus,
     currentStep,
     isConnected: isStreamConnected,
     isReplayingHistory,
@@ -382,6 +383,7 @@ export function ChatWorkspaceContainer({
       tokensPerSecond={tokensPerSecond}
       terminalTitle={terminalTitle}
       activityHint={activityHint}
+      mcpStatus={mcpStatus}
       currentStep={currentStep}
       currentSession={currentSession}
       isReplayingHistory={isReplayingHistory}

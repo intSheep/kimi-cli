@@ -32,6 +32,12 @@ export interface SessionStatus {
      */
     state: SessionStatusStateEnum;
     /**
+     * User-facing session lifecycle phase
+     * @type {string}
+     * @memberof SessionStatus
+     */
+    phase?: SessionStatusPhaseEnum;
+    /**
      * Monotonic sequence number
      * @type {number}
      * @memberof SessionStatus
@@ -78,6 +84,18 @@ export type SessionStatusStateEnum = typeof SessionStatusStateEnum[keyof typeof 
 
 
 /**
+ * @export
+ */
+export const SessionStatusPhaseEnum = {
+    Created: 'created',
+    Working: 'working',
+    NeedInput: 'need_input',
+    Completed: 'completed'
+} as const;
+export type SessionStatusPhaseEnum = typeof SessionStatusPhaseEnum[keyof typeof SessionStatusPhaseEnum];
+
+
+/**
  * Check if a given object implements the SessionStatus interface.
  */
 export function instanceOfSessionStatus(value: object): value is SessionStatus {
@@ -100,6 +118,7 @@ export function SessionStatusFromJSONTyped(json: any, ignoreDiscriminator: boole
         
         'sessionId': json['session_id'],
         'state': json['state'],
+        'phase': json['phase'] == null ? undefined : json['phase'],
         'seq': json['seq'],
         'workerId': json['worker_id'] == null ? undefined : json['worker_id'],
         'reason': json['reason'] == null ? undefined : json['reason'],
@@ -121,6 +140,7 @@ export function SessionStatusToJSONTyped(value?: SessionStatus | null, ignoreDis
         
         'session_id': value['sessionId'],
         'state': value['state'],
+        'phase': value['phase'],
         'seq': value['seq'],
         'worker_id': value['workerId'],
         'reason': value['reason'],
