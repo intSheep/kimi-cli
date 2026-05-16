@@ -259,6 +259,8 @@ type UseSessionStreamReturn = {
   contextUsage: number;
   /** Current token usage for the active step, if available */
   tokenUsage: TokenUsage | null;
+  /** Current streaming tokens per second (estimated) */
+  tokensPerSecond: number;
   /** Current step number */
   currentStep: number;
   /** Whether connected to the session stream */
@@ -337,6 +339,7 @@ export function useSessionStream(
   );
   const [contextUsage, setContextUsage] = useState(0);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
+  const [tokensPerSecond, setTokensPerSecond] = useState(0);
   const [planMode, setPlanMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
@@ -417,6 +420,10 @@ export function useSessionStream(
 
   // Track the temporary StepRetry status so the next attempt can replace it.
   const stepRetryStatusMessageIdRef = useRef<string | null>(null);
+
+  // Token throughput tracking
+  const tokenCountRef = useRef(0);
+  const tokenStartTimeRef = useRef<number | null>(null);
 
   // Wrapped setMessages
   const setMessages: typeof setMessagesInternal = useCallback((action) => {
@@ -888,12 +895,36 @@ export function useSessionStream(
     [],
   );
 
+  // Estimate token count for mixed CJK/Latin text (mirrors terminal heuristic)
+  const _estimateTokens = useCallback((text: string): number => {
+    let cjk = 0;
+    let other = 0;
+    for (const ch of text) {
+      const cp = ch.codePointAt(0) ?? 0;
+      if (
+        (cp >= 0x4E00 && cp <= 0x9FFF) || // CJK Unified Ideographs
+        (cp >= 0x3400 && cp <= 0x4DBF) || // CJK Extension A
+        (cp >= 0xF900 && cp <= 0xFAFF) || // CJK Compatibility Ideographs
+        (cp >= 0x3000 && cp <= 0x303F) || // CJK Symbols and Punctuation
+        (cp >= 0xFF00 && cp <= 0xFFEF) // Fullwidth Forms
+      ) {
+        cjk += 1;
+      } else {
+        other += 1;
+      }
+    }
+    return cjk * 1.5 + other / 4;
+  }, []);
+
   // Reset state for new step
   const resetStepState = useCallback(() => {
     currentThinkingRef.current = "";
     currentTextRef.current = "";
     thinkingMessageIdRef.current = null;
     textMessageIdRef.current = null;
+    tokenCountRef.current = 0;
+    tokenStartTimeRef.current = null;
+    setTokensPerSecond(0);
   }, []);
 
   const clearStepRetryStatus = useCallback(() => {
@@ -998,6 +1029,7 @@ export function useSessionStream(
     setCurrentStep(0);
     setContextUsage(0);
     setTokenUsage(null);
+    setTokensPerSecond(0);
     setPlanMode(false);
     setError(null);
     setSessionStatus(null);
@@ -1269,6 +1301,28 @@ export function useSessionStream(
           clearStepRetryStatus();
           if (!isReplay) {
             clearAwaitingFirstResponse();
+          }
+          const contentText =
+            event.payload.type === "think"
+              ? (event.payload.think ?? "")
+              : event.payload.type === "text"
+                ? (event.payload.text ?? "")
+                : "";
+          if (contentText && !isReplay) {
+            const added = _estimateTokens(contentText);
+            tokenCountRef.current += added;
+            if (tokenStartTimeRef.current === null) {
+              tokenStartTimeRef.current = performance.now();
+            }
+            const elapsedMs = performance.now() - tokenStartTimeRef.current;
+            // eslint-disable-next-line no-console
+            console.log("[ContentPart]", { type: event.payload.type, contentText: contentText.slice(0, 20), isReplay, added: added.toFixed(2), total: tokenCountRef.current.toFixed(2), elapsedMs: Math.round(elapsedMs) });
+            if (elapsedMs > 500) {
+              const rate = Math.round(tokenCountRef.current / (elapsedMs / 1000));
+              // eslint-disable-next-line no-console
+              console.log("[tok/s]", { rate });
+              setTokensPerSecond(rate);
+            }
           }
           if (event.payload.type === "think" && event.payload.think) {
             // Accumulate thinking content
@@ -2138,6 +2192,8 @@ export function useSessionStream(
       updateMessageById,
       setAwaitingFirstResponse,
       processSubagentEvent,
+      _estimateTokens,
+      setTokensPerSecond,
     ],
   );
 
@@ -3082,6 +3138,7 @@ export function useSessionStream(
     isAwaitingFirstResponse,
     contextUsage,
     tokenUsage,
+    tokensPerSecond,
     currentStep,
     isConnected,
     isReplayingHistory,

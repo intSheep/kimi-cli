@@ -31,6 +31,7 @@ type PromptToolbarProps = {
   usedTokens?: number;
   maxTokens?: number;
   tokenUsage?: TokenUsage | null;
+  tokensPerSecond?: number;
 };
 
 // ─── Main toolbar ────────────────────────────────────────────
@@ -45,6 +46,7 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
   usedTokens,
   maxTokens,
   tokenUsage,
+  tokensPerSecond,
 }: PromptToolbarProps): ReactElement | null {
   const queue = useQueueStore((s) => s.queue);
   const todoItems = useToolEventsStore((s) => s.todoItems);
@@ -101,6 +103,12 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
       <div className="flex items-center gap-1.5 px-1">
 {activityStatus && (
           <ToolbarActivityIndicator activity={activityStatus} />
+        )}
+
+        {tokensPerSecond && tokensPerSecond > 0 && (
+          <span className="flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent text-muted-foreground select-none">
+            {tokensPerSecond} tok/s
+          </span>
         )}
 
         {hasQueue && (

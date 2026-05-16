@@ -53,6 +53,8 @@ type ChatWorkspaceProps = {
   contextUsage?: number;
   /** Current step token usage from backend */
   tokenUsage?: TokenUsage | null;
+  /** Current streaming tokens per second (estimated) */
+  tokensPerSecond?: number;
   /** Current step number */
   currentStep?: number;
   /** Current session configuration */
@@ -106,6 +108,7 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
   sessionDescription,
   contextUsage = 0,
   tokenUsage = null,
+  tokensPerSecond = 0,
   currentStep = 0,
   currentSession,
   isReplayingHistory = false,
@@ -350,6 +353,7 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
                       usedTokens={usedTokens}
                       maxTokens={maxTokens}
                       tokenUsage={tokenUsage}
+                      tokensPerSecond={tokensPerSecond}
                     />
                   </div>
                 )}

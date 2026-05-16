@@ -69,6 +69,7 @@ type ChatPromptComposerProps = {
   usedTokens?: number;
   maxTokens?: number;
   tokenUsage?: TokenUsage | null;
+  tokensPerSecond?: number;
 };
 
 export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
@@ -92,6 +93,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
   usedTokens,
   maxTokens,
   tokenUsage,
+  tokensPerSecond,
 }: ChatPromptComposerProps): ReactElement {
   const promptController = usePromptInputController();
   const attachmentContext = usePromptInputAttachments();
@@ -203,6 +205,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
         usedTokens={usedTokens}
         maxTokens={maxTokens}
         tokenUsage={tokenUsage}
+        tokensPerSecond={tokensPerSecond}
       />
 
       <PromptInput

@@ -313,7 +313,6 @@ export const ToolbarActivityIndicator = memo(function ToolbarActivityIndicatorCo
         />
       </div>
 
-
       {/* Description text with animated transitions */}
       <AnimatePresence mode="wait">
         <motion.span

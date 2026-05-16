@@ -119,6 +119,7 @@ export function ChatWorkspaceContainer({
     cancel: cancelStream,
     contextUsage,
     tokenUsage,
+    tokensPerSecond,
     currentStep,
     isConnected: isStreamConnected,
     isReplayingHistory,
@@ -375,6 +376,7 @@ export function ChatWorkspaceContainer({
       contextUsage={contextUsage}
       maxContextSize={maxContextSize}
       tokenUsage={tokenUsage}
+      tokensPerSecond={tokensPerSecond}
       currentStep={currentStep}
       currentSession={currentSession}
       isReplayingHistory={isReplayingHistory}
