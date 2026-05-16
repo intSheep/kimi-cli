@@ -71,7 +71,13 @@ type ChatPromptComposerProps = {
   maxTokens?: number;
   tokenUsage?: TokenUsage | null;
   tokensPerSecond?: number;
-  mcpStatus?: { loading: boolean; connected: number; total: number; tools: number } | null;
+  mcpStatus?: {
+    loading: boolean;
+    connected: number;
+    total: number;
+    tools: number;
+    servers: { name: string; status: string; error?: string | null }[];
+  } | null;
 };
 
 export const ChatPromptComposer = memo(function ChatPromptComposerComponent({

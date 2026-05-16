@@ -143,6 +143,7 @@ export type McpStatusPayload = {
   connected: number;
   total: number;
   tools: number;
+  servers?: { name: string; status: string; error?: string | null }[];
 };
 
 export type StatusUpdateEvent = {

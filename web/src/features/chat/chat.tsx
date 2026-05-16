@@ -60,7 +60,13 @@ type ChatWorkspaceProps = {
   /** Current activity hint set by the agent */
   activityHint?: string;
   /** Current MCP loading status snapshot */
-  mcpStatus?: { loading: boolean; connected: number; total: number; tools: number } | null;
+  mcpStatus?: {
+    loading: boolean;
+    connected: number;
+    total: number;
+    tools: number;
+    servers: { name: string; status: string; error?: string | null }[];
+  } | null;
   /** Current step number */
   currentStep?: number;
   /** Current session configuration */
