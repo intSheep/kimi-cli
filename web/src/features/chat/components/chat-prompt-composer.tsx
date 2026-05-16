@@ -78,6 +78,7 @@ type ChatPromptComposerProps = {
     tools: number;
     servers: { name: string; status: string; error?: string | null }[];
   } | null;
+  activityHint?: string;
 };
 
 export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
@@ -104,6 +105,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
   tokenUsage,
   tokensPerSecond,
   mcpStatus,
+  activityHint,
 }: ChatPromptComposerProps): ReactElement {
   const promptController = usePromptInputController();
   const attachmentContext = usePromptInputAttachments();
@@ -218,6 +220,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
         tokenUsage={tokenUsage}
         tokensPerSecond={tokensPerSecond}
         mcpStatus={mcpStatus}
+        activityHint={activityHint}
       />
 
       <PromptInput

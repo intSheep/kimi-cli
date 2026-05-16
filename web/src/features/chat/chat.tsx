@@ -55,8 +55,6 @@ type ChatWorkspaceProps = {
   tokenUsage?: TokenUsage | null;
   /** Current streaming tokens per second (estimated) */
   tokensPerSecond?: number;
-  /** Current terminal title set by the agent */
-  terminalTitle?: string;
   /** Current activity hint set by the agent */
   activityHint?: string;
   /** Current MCP loading status snapshot */
@@ -123,7 +121,6 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
   contextUsage = 0,
   tokenUsage = null,
   tokensPerSecond = 0,
-  terminalTitle = "",
   activityHint = "",
   mcpStatus = null,
   currentStep = 0,
@@ -300,8 +297,6 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
         <ChatWorkspaceHeader
           currentStep={currentStep}
           sessionDescription={sessionDescription}
-          terminalTitle={terminalTitle}
-          activityHint={activityHint}
           currentSession={currentSession}
           selectedSessionId={selectedSessionId}
           isFilesPanelOpen={isFilesPanelOpen}
@@ -352,32 +347,33 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
                   />
                 ) : (
                   <div className="px-0 pb-0 pt-0 sm:px-3 sm:pb-3">
-                    <ChatPromptComposer
-                      status={status}
-                      onSubmit={onSubmit}
-                      canSendMessage={canSendMessage}
-                      currentSession={currentSession}
-                      isUploading={isUploading}
-                      isStreaming={isStreaming}
-                      isAwaitingIdle={isAwaitingIdle}
-                      isReplayingHistory={isReplayingHistory}
-                      onCancel={onCancel}
-                      onListSessionDirectory={onListSessionDirectory}
-                      gitDiffStats={gitDiffStats}
-                      isGitDiffLoading={isGitDiffLoading}
-                      slashCommands={slashCommands}
-                      planMode={planMode}
-                      onPlanModeChange={onPlanModeChange}
-                      onSteer={onSteer}
-                      activityStatus={activityStatus}
-                      usagePercent={usagePercent}
-                      usedTokens={usedTokens}
-                      maxTokens={maxTokens}
-                      tokenUsage={tokenUsage}
-                      tokensPerSecond={tokensPerSecond}
-                      mcpStatus={mcpStatus}
-                    />
-                  </div>
+                      <ChatPromptComposer
+                        status={status}
+                        onSubmit={onSubmit}
+                        canSendMessage={canSendMessage}
+                        currentSession={currentSession}
+                        isUploading={isUploading}
+                        isStreaming={isStreaming}
+                        isAwaitingIdle={isAwaitingIdle}
+                        isReplayingHistory={isReplayingHistory}
+                        onCancel={onCancel}
+                        onListSessionDirectory={onListSessionDirectory}
+                        gitDiffStats={gitDiffStats}
+                        isGitDiffLoading={isGitDiffLoading}
+                        slashCommands={slashCommands}
+                        planMode={planMode}
+                        onPlanModeChange={onPlanModeChange}
+                        onSteer={onSteer}
+                        activityStatus={activityStatus}
+                        activityHint={activityHint}
+                        usagePercent={usagePercent}
+                        usedTokens={usedTokens}
+                        maxTokens={maxTokens}
+                        tokenUsage={tokenUsage}
+                        tokensPerSecond={tokensPerSecond}
+                        mcpStatus={mcpStatus}
+                      />
+                    </div>
                 )}
               </div>
             )}

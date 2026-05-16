@@ -23,8 +23,6 @@ import { isMacOS } from "@/hooks/utils";
 type ChatWorkspaceHeaderProps = {
   currentStep: number;
   sessionDescription?: string;
-  terminalTitle?: string;
-  activityHint?: string;
   currentSession?: Session;
   selectedSessionId?: string;
   isFilesPanelOpen?: boolean;
@@ -39,8 +37,6 @@ type ChatWorkspaceHeaderProps = {
 export function ChatWorkspaceHeader({
   currentStep: _,
   sessionDescription,
-  terminalTitle,
-  activityHint,
   currentSession,
   selectedSessionId,
   isFilesPanelOpen = false,
@@ -139,11 +135,7 @@ export function ChatWorkspaceHeader({
               </TooltipContent>
             </Tooltip>
           ) : null}
-          {!isEditing && (terminalTitle || activityHint) && (
-            <p className="truncate text-[11px] text-muted-foreground">
-              {terminalTitle || activityHint}
-            </p>
-          )}
+
         </div>
       </div>
       <div className="flex items-center justify-end gap-2">

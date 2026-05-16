@@ -44,6 +44,7 @@ type PromptToolbarProps = {
     tools: number;
     servers: { name: string; status: string; error?: string | null }[];
   } | null;
+  activityHint?: string;
   onSteer?: (text: string) => void;
 };
 
@@ -61,6 +62,7 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
   tokenUsage,
   tokensPerSecond,
   mcpStatus,
+  activityHint,
   onSteer,
 }: PromptToolbarProps): ReactElement | null {
   const queue = useQueueStore((s) => s.queue);
@@ -115,17 +117,11 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
       )}
 
       {/* ── Tab bar ── */}
-      <div className="flex items-center gap-1.5 px-1">
-        {/* Left: activity / streaming stats / tabs */}
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center px-1">
+        {/* Left: activity / mcp / tok/s / tabs */}
+        <div className="flex items-center gap-1.5 flex-1 justify-start">
           {activityStatus && (
             <ToolbarActivityIndicator activity={activityStatus} />
-          )}
-
-          {tokensPerSecond && tokensPerSecond > 0 && (
-            <span className="flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent text-muted-foreground select-none">
-              {tokensPerSecond} tok/s
-            </span>
           )}
 
           {mcpStatus && mcpStatus.total > 0 && (
@@ -168,6 +164,12 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
             </Tooltip>
           )}
 
+          {tokensPerSecond && tokensPerSecond > 0 && (
+            <span className="flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent text-muted-foreground select-none">
+              {tokensPerSecond} tok/s
+            </span>
+          )}
+
           {hasQueue && (
             <ToolbarQueueTab
               count={queue.length}
@@ -193,18 +195,63 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
           )}
         </div>
 
-        {/* Spacer pushes context indicator to the far right */}
-        <div className="flex-1" />
+        {/* Center: activity hint with flowing light */}
+        <div className="flex items-center justify-center flex-shrink-0">
+          {activityHint && (
+            <div className="relative flex items-center justify-center">
+              {/* Outer glow — blurred ambient halo with breathe */}
+              <div
+                className="absolute rounded-full pointer-events-none"
+                style={{
+                  inset: "-3px",
+                  padding: "2px",
+                  background: "conic-gradient(from var(--activity-angle), transparent 0%, transparent 60%, rgba(140, 210, 220, 0.18) 75%, rgba(200, 245, 255, 0.35) 85%, rgba(140, 210, 220, 0.18) 95%, transparent 100%)",
+                  WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+                  WebkitMaskComposite: "xor",
+                  maskComposite: "exclude",
+                  filter: "blur(2px)",
+                  animation: "activity-hint-spin 3.5s linear infinite, activity-hint-soft-breathe 4s ease-in-out infinite",
+                }}
+              />
+              {/* Main stream — crisp flowing light */}
+              <div
+                className="absolute rounded-full pointer-events-none"
+                style={{
+                  inset: "-1.5px",
+                  padding: "1.5px",
+                  background: "conic-gradient(from var(--activity-angle), transparent 0%, transparent 65%, rgba(150, 220, 230, 0.45) 78%, rgba(210, 250, 255, 0.85) 88%, rgba(150, 220, 230, 0.45) 95%, transparent 100%)",
+                  WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+                  WebkitMaskComposite: "xor",
+                  maskComposite: "exclude",
+                  animation: "activity-hint-spin 3.5s linear infinite",
+                }}
+              />
+              {/* Static border — whisper thin */}
+              <div
+                className="absolute rounded-full pointer-events-none"
+                style={{
+                  inset: "-0.5px",
+                  border: "1px solid rgba(130, 210, 220, 0.12)",
+                }}
+              />
+              <span className="relative flex items-center h-7 px-2.5 rounded-full text-xs font-medium bg-transparent text-muted-foreground select-none truncate">
+                {activityHint}
+              </span>
+            </div>
+          )}
+        </div>
 
-        {/* Right: context / token usage — always at the end */}
-        {hasContext && (
-          <ToolbarContextIndicator
-            usagePercent={usagePercent!}
-            usedTokens={usedTokens!}
-            maxTokens={maxTokens!}
-            tokenUsage={tokenUsage ?? null}
-          />
-        )}
+        {/* Right: context */}
+        <div className="flex items-center gap-1.5 flex-1 justify-end">
+          {hasContext && (
+            <ToolbarContextIndicator
+              usagePercent={usagePercent!}
+              usedTokens={usedTokens!}
+              maxTokens={maxTokens!}
+              tokenUsage={tokenUsage ?? null}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

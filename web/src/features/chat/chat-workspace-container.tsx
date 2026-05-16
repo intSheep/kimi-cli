@@ -120,7 +120,6 @@ export function ChatWorkspaceContainer({
     contextUsage,
     tokenUsage,
     tokensPerSecond,
-    terminalTitle,
     activityHint,
     mcpStatus,
     currentStep,
@@ -381,7 +380,6 @@ export function ChatWorkspaceContainer({
       maxContextSize={maxContextSize}
       tokenUsage={tokenUsage}
       tokensPerSecond={tokensPerSecond}
-      terminalTitle={terminalTitle}
       activityHint={activityHint}
       mcpStatus={mcpStatus}
       currentStep={currentStep}
