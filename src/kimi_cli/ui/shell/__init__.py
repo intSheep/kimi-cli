@@ -237,6 +237,24 @@ class Shell:
             name
         )
 
+    def refresh_slash_commands(self) -> None:
+        """Rebuild available slash commands after skill enablement changes."""
+        soul = self.soul
+        soul_slash_commands = list(soul.available_slash_commands)
+        shell_slash_commands = shell_slash_registry.list_commands()
+        self._available_slash_commands = {
+            **{cmd.name: cmd for cmd in soul_slash_commands},
+            **{cmd.name: cmd for cmd in shell_slash_commands},
+        }
+        self._available_slash_command_index = self._index_slash_commands(
+            [*soul_slash_commands, *shell_slash_commands]
+        )
+        if self._prompt_session is not None:
+            self._prompt_session.update_slash_commands(
+                agent_mode_slash_commands=soul_slash_commands,
+                shell_mode_slash_commands=shell_slash_commands,
+            )
+
     def _print_cwd_lost_crash(self) -> None:
         """Print a crash report when the working directory is no longer accessible."""
         runtime = self.soul.runtime if isinstance(self.soul, KimiSoul) else None

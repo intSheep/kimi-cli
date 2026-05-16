@@ -295,27 +295,29 @@ def test_mcp_tool_call(tmp_path) -> None:
                     "method": "event",
                     "type": "TurnBegin",
                     "payload": {"user_input": "call mcp"},
-                }, {
-    "method": "event",
-    "type": "StatusUpdate",
-    "payload": {
-        "context_usage": None,
-        "context_tokens": None,
-        "max_context_tokens": None,
-        "token_usage": None,
-        "message_id": None,
-        "plan_mode": None,
-        "mcp_status": {
-            "loading": True,
-            "connected": 0,
-            "total": 1,
-            "tools": 0,
-            "servers": [
-                {"name": "test", "status": "connecting", "tools": [], "error": None}
-            ],
-        },
-    },
-}, {"method": "event", "type": "StepBegin", "payload": {"n": 1}},
+                },
+                {
+                    "method": "event",
+                    "type": "StatusUpdate",
+                    "payload": {
+                        "context_usage": None,
+                        "context_tokens": None,
+                        "max_context_tokens": None,
+                        "token_usage": None,
+                        "message_id": None,
+                        "plan_mode": None,
+                        "mcp_status": {
+                            "loading": True,
+                            "connected": 0,
+                            "total": 1,
+                            "tools": 0,
+                            "servers": [
+                                {"name": "test", "status": "connecting", "tools": [], "error": None}
+                            ],
+                        },
+                    },
+                },
+                {"method": "event", "type": "StepBegin", "payload": {"n": 1}},
                 {
                     "method": "event",
                     "type": "ContentPart",
@@ -343,20 +345,22 @@ def test_mcp_tool_call(tmp_path) -> None:
                         "plan_mode": False,
                         "mcp_status": None,
                     },
-                }, {
-    "method": "event",
-    "type": "ToolResult",
-    "payload": {
-        "tool_call_id": "tc-1",
-        "return_value": {
-            "is_error": True,
-            "output": "",
-            "message": "Tool `ping` not found",
-            "display": [{"type": "brief", "text": "Tool `ping` not found"}],
-            "extras": None,
-        },
-    },
-}, {"method": "event", "type": "StepBegin", "payload": {"n": 2}},
+                },
+                {
+                    "method": "event",
+                    "type": "ToolResult",
+                    "payload": {
+                        "tool_call_id": "tc-1",
+                        "return_value": {
+                            "is_error": True,
+                            "output": "",
+                            "message": "Tool `ping` not found",
+                            "display": [{"type": "brief", "text": "Tool `ping` not found"}],
+                            "extras": None,
+                        },
+                    },
+                },
+                {"method": "event", "type": "StepBegin", "payload": {"n": 2}},
                 {
                     "method": "event",
                     "type": "ContentPart",

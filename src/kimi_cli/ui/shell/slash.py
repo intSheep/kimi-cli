@@ -128,11 +128,8 @@ def help(app: Shell, args: str):
     )
 
     commands: list[SlashCommand[Any]] = []
-    skills: list[SlashCommand[Any]] = []
     for cmd in app.available_slash_commands.values():
-        if cmd.name.startswith(SKILL_COMMAND_PREFIX):
-            skills.append(cmd)
-        else:
+        if not cmd.hidden and not cmd.name.startswith(SKILL_COMMAND_PREFIX):
             commands.append(cmd)
 
     renderables.append(section("Keyboard shortcuts", _KEYBOARD_SHORTCUTS, "yellow"))
@@ -143,17 +140,38 @@ def help(app: Shell, args: str):
             "blue",
         )
     )
-    if skills:
-        renderables.append(
-            section(
-                "Skills",
-                _expanded_command_items(skills),
-                "cyan",
-            )
-        )
 
     with console.pager(styles=True):
         console.print(Group(*renderables))
+
+
+@registry.command
+async def skills(app: Shell, args: str):
+    """Open the skill picker to enable or disable skills"""
+    soul = ensure_kimi_soul(app)
+    if soul is None:
+        return
+    if app._prompt_session is None:  # pyright: ignore[reportPrivateUsage]
+        console.print("[yellow]/skills is only available in interactive shell mode.[/yellow]")
+        return
+
+    from kimi_cli.ui.shell.skill_picker import SkillPickerApp
+
+    picker = SkillPickerApp(
+        skills=soul.runtime.skills,
+        disabled=soul.runtime.disabled_skills,
+    )
+    new_disabled = await picker.run()
+    if new_disabled != soul.runtime.disabled_skills:
+        soul.runtime.disabled_skills = new_disabled
+        soul.refresh_slash_commands()
+        app.refresh_slash_commands()
+        console.print(
+            f"[green]Skills updated: {len(soul.runtime.skills) - len(new_disabled)} enabled, "
+            f"{len(new_disabled)} disabled.[/green]"
+        )
+    else:
+        console.print("[dim]No changes made.[/dim]")
 
 
 @registry.command

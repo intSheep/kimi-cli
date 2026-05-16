@@ -101,6 +101,8 @@ class SlashCommandCompleter(Completer):
         words: list[str] = []
 
         for cmd in sorted(self._available_commands, key=lambda c: c.name):
+            if cmd.hidden:
+                continue
             if cmd.name not in self._command_lookup:
                 self._command_lookup[cmd.name] = []
                 words.append(cmd.name)
@@ -1680,6 +1682,22 @@ class CustomPromptSession:
                 buff.document = Document(text=refolded, cursor_position=len(refolded))
 
         event.app.create_background_task(_run_editor())
+
+    def update_slash_commands(
+        self,
+        agent_mode_slash_commands: Sequence[SlashCommand[Any]],
+        shell_mode_slash_commands: Sequence[SlashCommand[Any]],
+    ) -> None:
+        """Refresh completers after slash commands change (e.g. skill enable/disable)."""
+        self._agent_mode_completer = merge_completers(
+            [
+                SlashCommandCompleter(agent_mode_slash_commands),
+                LocalFileMentionCompleter(KaosPath.cwd().unsafe_to_local_path()),
+            ],
+            deduplicate=True,
+        )
+        self._shell_mode_completer = SlashCommandCompleter(shell_mode_slash_commands)
+        self._apply_mode()
 
     def _apply_mode(self, event: KeyPressEvent | None = None) -> None:
         # Apply mode to the active buffer (not the PromptSession itself)
