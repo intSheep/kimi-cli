@@ -36,7 +36,7 @@ type ChatWorkspaceContainerProps = {
   selectedSessionId: string;
   currentSession?: Session;
   sessionDescription?: string;
-  onSessionStatus: (status: SessionStatus) => void;
+  onSessionStatus: (status: SessionStatus & { activity?: string }) => void;
   onStreamStatusChange?: (status: ChatStatus) => void;
   uploadSessionFile: (
     sessionId: string,

@@ -239,7 +239,7 @@ type UseSessionStreamOptions = {
   /** Callback when an error occurs */
   onError?: (error: Error) => void;
   /** Callback when session status changes */
-  onSessionStatus?: (status: SessionStatus) => void;
+  onSessionStatus?: (status: SessionStatus & { activity?: string }) => void;
   /** Callback when first turn is complete (for auto-renaming) */
   onFirstTurnComplete?: () => void;
 };
@@ -250,7 +250,7 @@ type UseSessionStreamReturn = {
   /** Chat status */
   status: ChatStatus;
   /** Latest runtime session status snapshot */
-  sessionStatus: SessionStatus | null;
+  sessionStatus: (SessionStatus & { activity?: string }) | null;
   /** Whether the stream is still replaying history */
   isReplayingHistory: boolean;
   /** Whether waiting for the first response after sending a prompt */
@@ -465,7 +465,7 @@ export function useSessionStream(
   }, [setAwaitingFirstResponse]);
 
   const normalizeSessionStatus = useCallback(
-    (payload: SessionStatusPayload): SessionStatus => ({
+    (payload: SessionStatusPayload): SessionStatus & { activity?: string } => ({
       sessionId: payload.session_id,
       state: payload.state,
       seq: payload.seq,
@@ -473,6 +473,7 @@ export function useSessionStream(
       reason: payload.reason ?? undefined,
       detail: payload.detail ?? undefined,
       updatedAt: new Date(payload.updated_at),
+      activity: payload.activity ?? undefined,
     }),
     [],
   );
@@ -2210,7 +2211,9 @@ export function useSessionStream(
           if (mcpMsgId) {
             setMessages((prev) => prev.filter((m) => m.id !== mcpMsgId));
           }
-          setMcpStatus(null);
+          setMcpStatus((prev) =>
+            prev ? { ...prev, loading: false } : null,
+          );
           break;
         }
 
