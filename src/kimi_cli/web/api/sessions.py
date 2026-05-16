@@ -278,7 +278,7 @@ async def list_sessions(
     for session in sessions:
         session_process = runner.get_session(session.session_id)
         session.is_running = session_process is not None and session_process.is_running
-        if session_process:
+        if session_process and session_process.is_running:
             session.status = session_process.status
         elif session.session_dir:
             session.status = build_session_status_for_stopped_session(
@@ -299,7 +299,7 @@ async def get_session(
     if session is not None:
         session_process = runner.get_session(session_id)
         session.is_running = session_process is not None and session_process.is_running
-        if session_process:
+        if session_process and session_process.is_running:
             session.status = session_process.status
         elif session.session_dir:
             session.status = build_session_status_for_stopped_session(
