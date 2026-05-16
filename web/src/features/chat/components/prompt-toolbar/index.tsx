@@ -126,10 +126,15 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
           </span>
         )}
 
-        {mcpStatus?.loading && (
+        {mcpStatus && mcpStatus.total > 0 && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent text-primary select-none cursor-help">
+              <span
+                className={cn(
+                  "flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium border border-border/60 bg-transparent select-none cursor-help",
+                  mcpStatus.loading ? "text-primary" : "text-muted-foreground",
+                )}
+              >
                 mcp {mcpStatus.connected}/{mcpStatus.total}
               </span>
             </TooltipTrigger>

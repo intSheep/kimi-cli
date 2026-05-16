@@ -972,8 +972,8 @@ class KimiSoul:
         # ── 1a. MCP deferred loading ──────────────────────────────────────────
         if isinstance(self._agent.toolset, KimiToolset):
             await self.start_background_mcp_loading()
-            loading = bool((snapshot := self._mcp_status_snapshot()) and snapshot.loading)
-            if loading:
+            snapshot = self._mcp_status_snapshot()
+            if snapshot:
                 wire_send(StatusUpdate(mcp_status=snapshot))
 
         # ═══════════════════════════════════════════════════════════════════════
