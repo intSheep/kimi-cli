@@ -162,6 +162,21 @@ function NeedInputIndicator(): ReactElement {
   );
 }
 
+/** Created — gentle emergence, a new seed breathing to life */
+function CreatedIndicator(): ReactElement {
+  return (
+    <div className="relative size-4 shrink-0 flex items-center justify-center">
+      <div
+        className="size-[4px] rounded-full bg-slate-400 dark:bg-slate-500"
+        style={{
+          animation:
+            "created-emerge 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, created-breathe 3s ease-in-out 0.5s infinite",
+        }}
+      />
+    </div>
+  );
+}
+
 function SessionStatusIndicator({ phase }: { phase?: string | null }): ReactElement | null {
   switch (phase) {
     case "working":
@@ -170,6 +185,8 @@ function SessionStatusIndicator({ phase }: { phase?: string | null }): ReactElem
       return <CompletedIndicator />;
     case "need_input":
       return <NeedInputIndicator />;
+    case "created":
+      return <CreatedIndicator />;
     default:
       return null;
   }
