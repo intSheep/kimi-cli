@@ -2198,6 +2198,7 @@ export function useSessionStream(
           if (mcpMsgId) {
             setMessages((prev) => prev.filter((m) => m.id !== mcpMsgId));
           }
+          setMcpStatus(null);
           break;
         }
 
