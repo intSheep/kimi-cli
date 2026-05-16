@@ -37,6 +37,11 @@ class SetTerminalTitle(CallableTool2[Params]):
             old=old or "(empty)",
             new=params.title,
         )
+        # Push the update to the UI wire so web clients can display it
+        from kimi_cli.soul import wire_send
+        from kimi_cli.wire.types import StatusUpdate
+
+        wire_send(StatusUpdate(title=params.title))
         return ToolReturnValue(
             is_error=False,
             output="",
