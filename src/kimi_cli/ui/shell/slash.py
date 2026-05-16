@@ -57,7 +57,7 @@ _KEYBOARD_SHORTCUTS = [
     ("Shift-Tab", "Toggle plan mode (read-only research)"),
     ("Ctrl-O", "Edit in external editor ($VISUAL/$EDITOR)"),
     ("Ctrl-J / Alt-Enter", "Insert newline"),
-    ("Ctrl-V", "Paste (supports images)"),
+    ("Ctrl-V / Alt-V", "Paste (supports images)"),
     ("Ctrl-D", "Exit"),
     ("Ctrl-C", "Interrupt"),
 ]
@@ -147,7 +147,7 @@ def help(app: Shell, args: str):
 
 @registry.command
 async def skills(app: Shell, args: str):
-    """Open the skill picker to enable or disable skills"""
+    """Open the skill manager"""
     soul = ensure_kimi_soul(app)
     if soul is None:
         return
@@ -155,23 +155,61 @@ async def skills(app: Shell, args: str):
         console.print("[yellow]/skills is only available in interactive shell mode.[/yellow]")
         return
 
-    from kimi_cli.ui.shell.skill_picker import SkillPickerApp
+    from kimi_cli.ui.shell.skill_picker import SkillEnableApp, SkillListApp, SkillMenuApp
 
-    picker = SkillPickerApp(
-        skills=soul.runtime.skills,
-        disabled=soul.runtime.disabled_skills,
-    )
-    new_disabled = await picker.run()
-    if new_disabled != soul.runtime.disabled_skills:
-        soul.runtime.disabled_skills = new_disabled
-        soul.refresh_slash_commands()
-        app.refresh_slash_commands()
-        console.print(
-            f"[green]Skills updated: {len(soul.runtime.skills) - len(new_disabled)} enabled, "
-            f"{len(new_disabled)} disabled.[/green]"
-        )
-    else:
+    # Show main menu
+    menu = SkillMenuApp()
+    choice = await menu.run()
+    if choice is None:
         console.print("[dim]No changes made.[/dim]")
+        return
+
+    if choice == "list":
+        picker = SkillListApp(
+            skills=soul.runtime.skills,
+            disabled=soul.runtime.disabled_skills,
+        )
+        skill_name = await picker.run()
+        if skill_name is None:
+            console.print("[dim]No skill selected.[/dim]")
+            return
+
+        # Prompt for optional arguments
+        from prompt_toolkit import PromptSession
+
+        prompt_session: PromptSession[str] = PromptSession()
+        try:
+            skill_args = await prompt_session.prompt_async(
+                f"Arguments for /{SKILL_COMMAND_PREFIX}{skill_name}: "
+            )
+        except (EOFError, KeyboardInterrupt):
+            console.print("[dim]Skill run cancelled.[/dim]")
+            return
+
+        command = f"/{SKILL_COMMAND_PREFIX}{skill_name}"
+        stripped_args = skill_args.strip()
+        if stripped_args:
+            command += f" {stripped_args}"
+        await app.run_soul_command(command)
+        return
+
+    if choice == "manage":
+        picker = SkillEnableApp(
+            skills=soul.runtime.skills,
+            disabled=soul.runtime.disabled_skills,
+        )
+        new_disabled = await picker.run()
+        if new_disabled != soul.runtime.disabled_skills:
+            soul.runtime.disabled_skills = new_disabled
+            soul.refresh_slash_commands()
+            app.refresh_slash_commands()
+            console.print(
+                f"[green]Skills updated: {len(soul.runtime.skills) - len(new_disabled)} enabled, "
+                f"{len(new_disabled)} disabled.[/green]"
+            )
+        else:
+            console.print("[dim]No changes made.[/dim]")
+        return
 
 
 @registry.command
