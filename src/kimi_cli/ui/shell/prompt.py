@@ -64,6 +64,7 @@ from kimi_cli.ui.shell.placeholders import (
 )
 from kimi_cli.ui.theme import get_prompt_style, get_toolbar_colors
 from kimi_cli.utils.clipboard import (
+    is_wsl,
     grab_media_from_clipboard,
     is_clipboard_available,
     is_media_clipboard_available,
@@ -1171,7 +1172,13 @@ def _build_toolbar_tips(clipboard_available: bool) -> list[str]:
         "/theme: switch dark/light",
     ]
     if clipboard_available:
-        tips.append("ctrl-v: paste clipboard")
+        # In WSL, Windows Terminal intercepts Ctrl+V for its own paste
+        # (bracketed paste for text), so advertise Alt+V as the app-level
+        # media-paste shortcut.
+        if is_wsl():
+            tips.append("alt-v: paste clipboard")
+        else:
+            tips.append("ctrl-v: paste clipboard")
     tips.append("@: mention files")
     return tips
 
@@ -1489,6 +1496,25 @@ class CustomPromptSession:
         if clipboard_available or media_clipboard_available:
 
             @_kb.add("c-v", eager=True)
+            def _(event: KeyPressEvent) -> None:
+                from kimi_cli.telemetry import track
+
+                track("shortcut_paste")
+                if self._try_paste_media(event):
+                    return
+                if clipboard_available:
+                    try:
+                        clipboard_data = event.app.clipboard.get_data()
+                    except Exception:
+                        return
+                    if clipboard_data is None:  # type: ignore[reportUnnecessaryComparison]
+                        return
+                    self._insert_pasted_text(event.current_buffer, clipboard_data.text)
+                    event.app.invalidate()
+
+            # Alt-V fallback for terminals (e.g. Windows Terminal + WSL) that
+            # intercept Ctrl+V and send bracketed-paste instead of the raw key.
+            @_kb.add("escape", "v", eager=True)
             def _(event: KeyPressEvent) -> None:
                 from kimi_cli.telemetry import track
 

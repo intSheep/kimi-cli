@@ -10,7 +10,9 @@ from kimi_cli.utils.clipboard import (
     _VIDEO_SUFFIXES,
     _classify_file_paths,
     _grab_image_linux,
+    _grab_image_wsl,
     is_media_clipboard_available,
+    is_wsl,
 )
 
 
@@ -555,3 +557,222 @@ def test_grab_image_linux_timeout(monkeypatch) -> None:
     result = _grab_image_linux()
     assert result is None
     assert calls == ["xclip", "wl-paste"]
+
+
+# --- WSL tests ---
+
+
+def test_is_wsl_detects_wsl(monkeypatch, tmp_path: Path) -> None:
+    proc_version = tmp_path / "version"
+    proc_version.write_text("Linux version 5.15.167.4-microsoft-standard-WSL2")
+
+    monkeypatch.setattr(
+        "kimi_cli.utils.clipboard._PROC_VERSION_PATH", str(proc_version), raising=False
+    )
+
+    def patched_is_wsl() -> bool:
+        try:
+            with open(str(proc_version), "rb") as f:
+                version = f.read()
+            return b"Microsoft" in version or b"WSL" in version
+        except Exception:
+            return False
+
+    monkeypatch.setattr("kimi_cli.utils.clipboard.is_wsl", patched_is_wsl)
+    from kimi_cli.utils.clipboard import is_wsl as current_is_wsl
+
+    assert current_is_wsl() is True
+
+
+def test_is_wsl_returns_false_on_plain_linux(monkeypatch, tmp_path: Path) -> None:
+    proc_version = tmp_path / "version"
+    proc_version.write_text("Linux version 6.5.0-generic")
+
+    def patched_is_wsl() -> bool:
+        try:
+            with open(str(proc_version), "rb") as f:
+                version = f.read()
+            return b"Microsoft" in version or b"WSL" in version
+        except Exception:
+            return False
+
+    monkeypatch.setattr("kimi_cli.utils.clipboard.is_wsl", patched_is_wsl)
+    from kimi_cli.utils.clipboard import is_wsl as current_is_wsl
+
+    assert current_is_wsl() is False
+
+
+def test_media_clipboard_available_wsl_with_powershell(monkeypatch) -> None:
+    """On WSL without xclip/wl-paste, powershell.exe makes media clipboard available."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda cmd: "/mnt/c/Windows/powershell.exe" if cmd == "powershell.exe" else None,
+    )
+    monkeypatch.setattr("kimi_cli.utils.clipboard.is_wsl", lambda: True)
+
+    assert is_media_clipboard_available() is True
+
+
+def test_media_clipboard_available_wsl_without_powershell(monkeypatch) -> None:
+    """On WSL without xclip/wl-paste and without powershell.exe, media clipboard is unavailable."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(shutil, "which", lambda _cmd: None)
+    monkeypatch.setattr("kimi_cli.utils.clipboard.is_wsl", lambda: True)
+
+    assert is_media_clipboard_available() is False
+
+
+def test_grab_image_wsl_succeeds(monkeypatch, tmp_path: Path) -> None:
+    """When powershell returns valid base64 PNG data, parse it into an Image."""
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda cmd: "/mnt/c/Windows/powershell.exe" if cmd == "powershell.exe" else None,
+    )
+
+    img_path = tmp_path / "clipboard.png"
+    Image.new("RGBA", (4, 4)).save(img_path)
+    img_bytes = img_path.read_bytes()
+    b64_data = __import__("base64").b64encode(img_bytes).decode()
+
+    def fake_run(args, **_kwargs):
+        class FakeResult:
+            returncode = 0
+            stdout = b64_data
+            stderr = ""
+
+        return FakeResult()
+
+    monkeypatch.setattr("kimi_cli.utils.clipboard.subprocess.run", fake_run)
+
+    result = _grab_image_wsl()
+    assert result is not None
+    assert result.size == (4, 4)
+
+
+def test_grab_image_wsl_no_image(monkeypatch) -> None:
+    """When clipboard has no image, powershell returns NO_IMAGE."""
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda cmd: "/mnt/c/Windows/powershell.exe" if cmd == "powershell.exe" else None,
+    )
+
+    def fake_run(args, **_kwargs):
+        class FakeResult:
+            returncode = 0
+            stdout = "NO_IMAGE"
+            stderr = ""
+
+        return FakeResult()
+
+    monkeypatch.setattr("kimi_cli.utils.clipboard.subprocess.run", fake_run)
+
+    result = _grab_image_wsl()
+    assert result is None
+
+
+def test_grab_image_wsl_powershell_not_found(monkeypatch) -> None:
+    """When powershell.exe is not in PATH, return None immediately."""
+    monkeypatch.setattr(shutil, "which", lambda _cmd: None)
+
+    result = _grab_image_wsl()
+    assert result is None
+
+
+def test_grab_image_wsl_powershell_error(monkeypatch) -> None:
+    """When powershell exits with non-zero, return None."""
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda cmd: "/mnt/c/Windows/powershell.exe" if cmd == "powershell.exe" else None,
+    )
+
+    def fake_run(args, **_kwargs):
+        class FakeResult:
+            returncode = 1
+            stdout = ""
+            stderr = "Some error"
+
+        return FakeResult()
+
+    monkeypatch.setattr("kimi_cli.utils.clipboard.subprocess.run", fake_run)
+
+    result = _grab_image_wsl()
+    assert result is None
+
+
+def test_grab_image_wsl_timeout(monkeypatch) -> None:
+    """When powershell times out, return None."""
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda cmd: "/mnt/c/Windows/powershell.exe" if cmd == "powershell.exe" else None,
+    )
+
+    def fake_run(args, **_kwargs):
+        import subprocess
+
+        raise subprocess.TimeoutExpired(cmd=args[0], timeout=10)
+
+    monkeypatch.setattr("kimi_cli.utils.clipboard.subprocess.run", fake_run)
+
+    result = _grab_image_wsl()
+    assert result is None
+
+
+def test_grab_image_wsl_invalid_base64(monkeypatch) -> None:
+    """When powershell returns non-base64 garbage, return None."""
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda cmd: "/mnt/c/Windows/powershell.exe" if cmd == "powershell.exe" else None,
+    )
+
+    def fake_run(args, **_kwargs):
+        class FakeResult:
+            returncode = 0
+            stdout = "not_valid_base64!!!"
+            stderr = ""
+
+        return FakeResult()
+
+    monkeypatch.setattr("kimi_cli.utils.clipboard.subprocess.run", fake_run)
+
+    result = _grab_image_wsl()
+    assert result is None
+
+
+def test_grab_media_from_clipboard_wsl_fallback(monkeypatch, tmp_path: Path) -> None:
+    """On WSL, when xclip/wl-paste fail, fallback to _grab_image_wsl."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda cmd: "/mnt/c/Windows/powershell.exe" if cmd == "powershell.exe" else None,
+    )
+    monkeypatch.setattr("kimi_cli.utils.clipboard.is_wsl", lambda: True)
+
+    img_path = tmp_path / "clipboard.png"
+    Image.new("RGB", (3, 3)).save(img_path)
+    img_bytes = img_path.read_bytes()
+    b64_data = __import__("base64").b64encode(img_bytes).decode()
+
+    def fake_run(args, **_kwargs):
+        class FakeResult:
+            returncode = 0
+            stdout = b64_data
+            stderr = ""
+
+        return FakeResult()
+
+    monkeypatch.setattr("kimi_cli.utils.clipboard.subprocess.run", fake_run)
+
+    from kimi_cli.utils.clipboard import grab_media_from_clipboard
+
+    result = grab_media_from_clipboard()
+    assert result is not None
+    assert len(result.images) == 1
+    assert result.images[0].size == (3, 3)
