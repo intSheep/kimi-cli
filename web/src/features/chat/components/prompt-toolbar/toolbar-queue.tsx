@@ -31,8 +31,8 @@ function QueueItemRow({ item, isFirst, onEdit, onSteer }: { item: QueuedItem; is
   const moveQueueItemUp = useQueueStore((s) => s.moveQueueItemUp);
 
   return (
-    <div className="group flex items-center gap-1.5 px-3 py-1.5  hover:bg-muted/50 transition-colors">
-      <p className="min-w-0 text-xs text-foreground truncate leading-relaxed">
+    <div className="group flex items-center gap-1.5 px-3 py-1.5 hover:bg-muted/50 transition-colors min-w-0 overflow-hidden">
+      <p className="flex-1 min-w-0 text-xs text-foreground truncate leading-relaxed">
         {item.text}
       </p>
       <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
