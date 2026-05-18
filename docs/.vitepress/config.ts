@@ -112,6 +112,7 @@ export default withMermaid(defineConfig({
           { text: 'Reference', link: '/en/reference/kimi-command', activeMatch: '/en/reference/' },
           { text: 'FAQ', link: '/en/faq' },
           { text: 'Release Notes', link: '/en/release-notes/changelog', activeMatch: '/en/release-notes/' },
+          { text: 'Development', link: '/en/development/architecture', activeMatch: '/en/development/' },
         ],
         sidebar: {
           '/en/guides/': [
@@ -175,6 +176,14 @@ export default withMermaid(defineConfig({
               items: [
                 { text: 'Changelog', link: '/en/release-notes/changelog' },
                 { text: 'Breaking Changes and Migration', link: '/en/release-notes/breaking-changes' },
+              ],
+            },
+          ],
+          '/en/development/': [
+            {
+              text: 'Development',
+              items: [
+                { text: 'Architecture', link: '/en/development/architecture' },
               ],
             },
           ],

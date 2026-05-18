@@ -1,0 +1,38 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- tail -->
+  <path d="M 145 140 Q 175 120 180 90" stroke="#FF8C00" fill="none" stroke-width="14" stroke-linecap="round"/>
+  <!-- body -->
+  <ellipse cx="100" cy="135" rx="55" ry="48" fill="#FFA500"/>
+  <!-- head -->
+  <circle cx="100" cy="75" r="42" fill="#FFA500"/>
+  <!-- ears outer -->
+  <polygon points="68,48 55,15 88,42" fill="#FFA500"/>
+  <polygon points="132,48 145,15 112,42" fill="#FFA500"/>
+  <!-- ears inner -->
+  <polygon points="72,42 64,22 82,38" fill="#FFB6C1"/>
+  <polygon points="128,42 136,22 118,38" fill="#FFB6C1"/>
+  <!-- eyes -->
+  <ellipse cx="84" cy="72" rx="6" ry="8" fill="#222"/>
+  <ellipse cx="116" cy="72" rx="6" ry="8" fill="#222"/>
+  <!-- eye shine -->
+  <circle cx="86" cy="69" r="2.5" fill="white"/>
+  <circle cx="118" cy="69" r="2.5" fill="white"/>
+  <!-- nose -->
+  <polygon points="100,82 94,90 106,90" fill="#FF69B4"/>
+  <!-- mouth -->
+  <path d="M 100 90 Q 90 98 82 92" stroke="#333" fill="none" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M 100 90 Q 110 98 118 92" stroke="#333" fill="none" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- whiskers -->
+  <line x1="58" y1="82" x2="35" y2="76" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="58" y1="88" x2="35" y2="88" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="58" y1="94" x2="35" y2="100" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="142" y1="82" x2="165" y2="76" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="142" y1="88" x2="165" y2="88" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="142" y1="94" x2="165" y2="100" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- paws -->
+  <ellipse cx="78" cy="172" rx="14" ry="10" fill="#FFA500"/>
+  <ellipse cx="122" cy="172" rx="14" ry="10" fill="#FFA500"/>
+  <!-- toe beans -->
+  <ellipse cx="78" cy="175" rx="3" ry="2" fill="#FF69B4"/>
+  <ellipse cx="122" cy="175" rx="3" ry="2" fill="#FF69B4"/>
+</svg>
