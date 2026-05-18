@@ -163,6 +163,8 @@ All packages share the same build backend (`uv_build`), line length (100), ruff 
 - `web/`: React frontend source code (Vite + Tailwind + shadcn/ui).
 - `vis/`: React visualization frontend.
 
+> **注意**：修改 `web/` 或 `vis/` 目录下的前端源码后，必须运行 `make build-web`（或 `make build-vis`）重新构建，并将产物同步到 `src/kimi_cli/web/static/`（或 `src/kimi_cli/vis/static/`）。未重新构建直接运行后端会导致前端页面加载失败。
+
 ### ACP server
 - `src/kimi_cli/acp/`: Agent Client Protocol server components for IDE integration.
 
@@ -308,6 +310,8 @@ A `flake.nix` is provided for reproducible builds. CI runs `nix run .#kimi-cli -
 
 ### Web UI release
 The web frontend is built with `make build-web` and embedded into the Python package as static files. The vis UI is similarly built with `make build-vis`.
+
+> **开发约束**：任何修改了 `web/`、`vis/` 或 `src/kimi_cli/web/`、`src/kimi_cli/vis/` 的 PR，在提交前必须执行对应的构建命令（`make build-web` / `make build-vis`），确保静态资源已同步到 Python 包目录。CI 不会自动代为构建前端资源。
 
 ## Security considerations
 
