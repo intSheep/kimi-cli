@@ -13,7 +13,7 @@ import { formatRelativeTime } from "./hooks/utils";
 import { useSessions } from "./hooks/useSessions";
 import { useTheme } from "./hooks/use-theme";
 import { ThemeToggle } from "./components/ui/theme-toggle";
-import type { SessionStatus } from "./lib/api/models";
+import type { Session, SessionStatus } from "./lib/api/models";
 import type { PanelSize, PanelImperativeHandle } from "react-resizable-panels";
 import { consumeAuthTokenFromUrl, setAuthToken } from "./lib/auth";
 
@@ -266,8 +266,49 @@ function App() {
     setStreamStatus(nextStatus);
   }, []);
 
+  // Refs for session phase tracking (to detect working -> completed/need_input)
+  const lastSessionPhasesRef = useRef<Map<string, { phase: string; seq: number }>>(new Map());
+  const selectSessionRef = useRef(selectSession);
+  selectSessionRef.current = selectSession;
+  const prevSessionsRef = useRef<Session[]>([]);
+
   const handleSessionStatus = useCallback(
-    (status: SessionStatus) => {
+    (status: SessionStatus & { activity?: string }) => {
+      // Detect phase transition: working -> completed / need_input
+      const prev = lastSessionPhasesRef.current.get(status.sessionId);
+      const currentPhase = status.phase;
+
+      if (prev?.phase === "working" && (currentPhase === "completed" || currentPhase === "need_input")) {
+        if (status.seq > (prev?.seq ?? -1)) {
+          const session = sessions.find((s) => s.sessionId === status.sessionId);
+          const title = session?.title ?? "Untitled Session";
+
+          if (currentPhase === "completed") {
+            toast.success(title, {
+              description: status.activity || "Completed",
+              duration: 5000,
+              action: {
+                label: "View",
+                onClick: () => selectSessionRef.current(status.sessionId),
+              },
+            });
+          } else {
+            toast.info(title, {
+              description: status.activity || "Needs your input",
+              duration: 8000,
+              action: {
+                label: "Reply",
+                onClick: () => selectSessionRef.current(status.sessionId),
+              },
+            });
+          }
+        }
+      }
+
+      if (currentPhase) {
+        lastSessionPhasesRef.current.set(status.sessionId, { phase: currentPhase, seq: status.seq });
+      }
+
       applySessionStatus(status);
 
       if (status.state !== "idle") {
@@ -291,8 +332,55 @@ function App() {
       );
       refreshSession(status.sessionId);
     },
-    [applySessionStatus, refreshSession],
+    [applySessionStatus, refreshSession, sessions],
   );
+
+  // Detect background session phase changes from HTTP polling (no activity available)
+  useEffect(() => {
+    for (const session of sessions) {
+      if (!session.status?.phase) continue;
+
+      const prevSession = prevSessionsRef.current.find((s) => s.sessionId === session.sessionId);
+      const prevPhase = prevSession?.status?.phase;
+      const currentPhase = session.status.phase;
+
+      if (prevPhase === "working" && (currentPhase === "completed" || currentPhase === "need_input")) {
+        const refEntry = lastSessionPhasesRef.current.get(session.sessionId);
+        if (session.status.seq > (refEntry?.seq ?? -1)) {
+          const title = session.title ?? "Untitled Session";
+
+          if (currentPhase === "completed") {
+            toast.success(title, {
+              description: "Completed",
+              duration: 5000,
+              action: {
+                label: "View",
+                onClick: () => selectSessionRef.current(session.sessionId),
+              },
+            });
+          } else {
+            toast.info(title, {
+              description: "Needs your input",
+              duration: 8000,
+              action: {
+                label: "Reply",
+                onClick: () => selectSessionRef.current(session.sessionId),
+              },
+            });
+          }
+
+          lastSessionPhasesRef.current.set(session.sessionId, { phase: currentPhase, seq: session.status.seq });
+        }
+      } else if (currentPhase) {
+        const refEntry = lastSessionPhasesRef.current.get(session.sessionId);
+        if (!refEntry || session.status.seq >= refEntry.seq) {
+          lastSessionPhasesRef.current.set(session.sessionId, { phase: currentPhase, seq: session.status.seq });
+        }
+      }
+    }
+
+    prevSessionsRef.current = sessions;
+  }, [sessions]);
 
   const handleCreateSession = useCallback(
     async (workDir: string, createDir?: boolean) => {
@@ -343,6 +431,7 @@ function App() {
         updatedAt: formatRelativeTime(session.lastUpdated),
         workDir: session.workDir,
         lastUpdated: session.lastUpdated,
+        status: session.status,
       })),
     [sessions],
   );
@@ -356,6 +445,7 @@ function App() {
         updatedAt: formatRelativeTime(session.lastUpdated),
         workDir: session.workDir,
         lastUpdated: session.lastUpdated,
+        status: session.status,
       })),
     [archivedSessions],
   );

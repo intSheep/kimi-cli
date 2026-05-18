@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -200,6 +200,8 @@ class Runtime:
     """Current activity hint set by the SetActivityHint tool for UI display."""
     terminal_title: str = ""
     """Current terminal title set by the SetTerminalTitle tool for UI display."""
+    disabled_skills: set[str] = field(default_factory=set)  # type: ignore[reportUnknownVariableType]
+    """Set of normalized skill names that should be disabled."""
 
     def __post_init__(self) -> None:
         if self.subagent_store is None:

@@ -35,7 +35,7 @@ import {
   XIcon,
 } from "lucide-react";
 import type { ComponentProps, JSX, MouseEvent, ReactNode } from "react";
-import { createContext, isValidElement, useCallback, useMemo, useState } from "react";
+import { createContext, isValidElement, useCallback, useEffect, useMemo, useState } from "react";
 import { isMacOS } from "@/hooks/utils";
 import { useVideoThumbnail } from "@/hooks/useVideoThumbnail";
 import { CodeBlock } from "./code-block";
@@ -159,6 +159,14 @@ export type ToolHeaderProps = {
   state: ToolState;
   input?: ToolUIPart["input"];
   className?: string;
+  startTime?: number;
+  duration?: number;
+};
+
+/** Format milliseconds into a compact duration string (e.g. "1.2s", "45ms") */
+const formatDuration = (ms: number): string => {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
 };
 
 export const ToolHeader = ({
@@ -167,12 +175,29 @@ export const ToolHeader = ({
   type,
   state,
   input,
+  startTime,
+  duration,
   ...props
 }: ToolHeaderProps) => {
   const rawName = title ?? type.split("-").slice(1).join("-");
   const displayName = TOOL_DISPLAY_NAMES[rawName] ?? rawName;
   const icon = TOOL_ICONS[rawName];
   const primaryParam = getPrimaryParam(input);
+
+  const isRunning = state === "input-streaming" || state === "input-available";
+  const [elapsed, setElapsed] = useState(duration ?? 0);
+
+  useEffect(() => {
+    if (!isRunning || !startTime) {
+      if (duration) setElapsed(duration);
+      return;
+    }
+    setElapsed(Math.round(performance.now() - startTime));
+    const id = window.setInterval(() => {
+      setElapsed(Math.round(performance.now() - startTime));
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [isRunning, startTime, duration]);
 
   const fullUrl =
     rawName === "FetchURL" &&
@@ -218,6 +243,11 @@ export const ToolHeader = ({
         </span>
       )}
       <span className="ml-0.5">{getStatusIcon(state)}</span>
+      {(isRunning || duration !== undefined) && elapsed > 0 && (
+        <span className="text-[11px] text-muted-foreground tabular-nums select-none">
+          {formatDuration(elapsed)}
+        </span>
+      )}
     </CollapsibleTrigger>
   );
 };

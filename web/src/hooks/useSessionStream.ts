@@ -239,7 +239,7 @@ type UseSessionStreamOptions = {
   /** Callback when an error occurs */
   onError?: (error: Error) => void;
   /** Callback when session status changes */
-  onSessionStatus?: (status: SessionStatus) => void;
+  onSessionStatus?: (status: SessionStatus & { activity?: string }) => void;
   /** Callback when first turn is complete (for auto-renaming) */
   onFirstTurnComplete?: () => void;
 };
@@ -250,7 +250,7 @@ type UseSessionStreamReturn = {
   /** Chat status */
   status: ChatStatus;
   /** Latest runtime session status snapshot */
-  sessionStatus: SessionStatus | null;
+  sessionStatus: (SessionStatus & { activity?: string }) | null;
   /** Whether the stream is still replaying history */
   isReplayingHistory: boolean;
   /** Whether waiting for the first response after sending a prompt */
@@ -259,6 +259,20 @@ type UseSessionStreamReturn = {
   contextUsage: number;
   /** Current token usage for the active step, if available */
   tokenUsage: TokenUsage | null;
+  /** Current streaming tokens per second (estimated) */
+  tokensPerSecond: number;
+  /** Current terminal title set by the agent */
+  terminalTitle: string;
+  /** Current activity hint set by the agent */
+  activityHint: string;
+  /** Current MCP loading status snapshot */
+  mcpStatus: {
+    loading: boolean;
+    connected: number;
+    total: number;
+    tools: number;
+    servers: { name: string; status: string; error?: string | null }[];
+  } | null;
   /** Current step number */
   currentStep: number;
   /** Whether connected to the session stream */
@@ -294,6 +308,8 @@ type UseSessionStreamReturn = {
   planMode: boolean;
   /** Set plan mode via silent RPC (no context message) */
   sendSetPlanMode: (enabled: boolean) => void;
+  /** Steer the current running turn with additional input */
+  steer: (text: string) => void;
   /** Available slash commands from the server */
   slashCommands: SlashCommandDef[];
 };
@@ -337,6 +353,16 @@ export function useSessionStream(
   );
   const [contextUsage, setContextUsage] = useState(0);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
+  const [tokensPerSecond, setTokensPerSecond] = useState(0);
+  const [terminalTitle, setTerminalTitle] = useState("");
+  const [activityHint, setActivityHint] = useState("");
+  const [mcpStatus, setMcpStatus] = useState<{
+    loading: boolean;
+    connected: number;
+    total: number;
+    tools: number;
+    servers: { name: string; status: string; error?: string | null }[];
+  } | null>(null);
   const [planMode, setPlanMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
@@ -418,6 +444,10 @@ export function useSessionStream(
   // Track the temporary StepRetry status so the next attempt can replace it.
   const stepRetryStatusMessageIdRef = useRef<string | null>(null);
 
+  // Token throughput tracking
+  const tokenCountRef = useRef(0);
+  const tokenStartTimeRef = useRef<number | null>(null);
+
   // Wrapped setMessages
   const setMessages: typeof setMessagesInternal = useCallback((action) => {
     setMessagesInternal(action);
@@ -435,7 +465,7 @@ export function useSessionStream(
   }, [setAwaitingFirstResponse]);
 
   const normalizeSessionStatus = useCallback(
-    (payload: SessionStatusPayload): SessionStatus => ({
+    (payload: SessionStatusPayload): SessionStatus & { activity?: string } => ({
       sessionId: payload.session_id,
       state: payload.state,
       seq: payload.seq,
@@ -443,6 +473,7 @@ export function useSessionStream(
       reason: payload.reason ?? undefined,
       detail: payload.detail ?? undefined,
       updatedAt: new Date(payload.updated_at),
+      activity: payload.activity ?? undefined,
     }),
     [],
   );
@@ -888,12 +919,36 @@ export function useSessionStream(
     [],
   );
 
+  // Estimate token count for mixed CJK/Latin text (mirrors terminal heuristic)
+  const _estimateTokens = useCallback((text: string): number => {
+    let cjk = 0;
+    let other = 0;
+    for (const ch of text) {
+      const cp = ch.codePointAt(0) ?? 0;
+      if (
+        (cp >= 0x4E00 && cp <= 0x9FFF) || // CJK Unified Ideographs
+        (cp >= 0x3400 && cp <= 0x4DBF) || // CJK Extension A
+        (cp >= 0xF900 && cp <= 0xFAFF) || // CJK Compatibility Ideographs
+        (cp >= 0x3000 && cp <= 0x303F) || // CJK Symbols and Punctuation
+        (cp >= 0xFF00 && cp <= 0xFFEF) // Fullwidth Forms
+      ) {
+        cjk += 1;
+      } else {
+        other += 1;
+      }
+    }
+    return cjk * 1.5 + other / 4;
+  }, []);
+
   // Reset state for new step
   const resetStepState = useCallback(() => {
     currentThinkingRef.current = "";
     currentTextRef.current = "";
     thinkingMessageIdRef.current = null;
     textMessageIdRef.current = null;
+    tokenCountRef.current = 0;
+    tokenStartTimeRef.current = null;
+    setTokensPerSecond(0);
   }, []);
 
   const clearStepRetryStatus = useCallback(() => {
@@ -998,6 +1053,10 @@ export function useSessionStream(
     setCurrentStep(0);
     setContextUsage(0);
     setTokenUsage(null);
+    setTokensPerSecond(0);
+    setTerminalTitle("");
+    setActivityHint("");
+    setMcpStatus(null);
     setPlanMode(false);
     setError(null);
     setSessionStatus(null);
@@ -1270,6 +1329,28 @@ export function useSessionStream(
           if (!isReplay) {
             clearAwaitingFirstResponse();
           }
+          const contentText =
+            event.payload.type === "think"
+              ? (event.payload.think ?? "")
+              : event.payload.type === "text"
+                ? (event.payload.text ?? "")
+                : "";
+          if (contentText && !isReplay) {
+            const added = _estimateTokens(contentText);
+            tokenCountRef.current += added;
+            if (tokenStartTimeRef.current === null) {
+              tokenStartTimeRef.current = performance.now();
+            }
+            const elapsedMs = performance.now() - tokenStartTimeRef.current;
+            // eslint-disable-next-line no-console
+            console.log("[ContentPart]", { type: event.payload.type, contentText: contentText.slice(0, 20), isReplay, added: added.toFixed(2), total: tokenCountRef.current.toFixed(2), elapsedMs: Math.round(elapsedMs) });
+            if (elapsedMs > 500) {
+              const rate = Math.round(tokenCountRef.current / (elapsedMs / 1000));
+              // eslint-disable-next-line no-console
+              console.log("[tok/s]", { rate });
+              setTokensPerSecond(rate);
+            }
+          }
           if (event.payload.type === "think" && event.payload.think) {
             // Accumulate thinking content
             currentThinkingRef.current += event.payload.think;
@@ -1388,6 +1469,7 @@ export function useSessionStream(
               state: "input-streaming" as ToolUIPart["state"],
               toolCallId: toolCall.id,
               input: parsedInput,
+              startTime: performance.now(),
             },
             isStreaming: !isReplay,
           });
@@ -1507,6 +1589,9 @@ export function useSessionStream(
           setMessages((prev) =>
             prev.map((msg) => {
               if (msg.toolCall?.toolCallId !== tool_call_id) return msg;
+              const duration = msg.toolCall?.startTime
+                ? Math.round(performance.now() - msg.toolCall.startTime)
+                : undefined;
               return {
                 ...msg,
                 toolCall: {
@@ -1528,6 +1613,7 @@ export function useSessionStream(
                   subagentRunning: msg.toolCall.subagentSteps
                     ? false
                     : msg.toolCall.subagentRunning,
+                  duration,
                 },
                 isStreaming: false,
               };
@@ -1904,6 +1990,31 @@ export function useSessionStream(
             setPlanMode(nextPlanMode);
           }
 
+          const nextTitle = event.payload.title;
+          if (typeof nextTitle === "string") {
+            setTerminalTitle(nextTitle);
+          }
+
+          const nextActivity = event.payload.activity;
+          if (typeof nextActivity === "string") {
+            setActivityHint(nextActivity);
+          }
+
+          const nextMcpStatus = event.payload.mcp_status;
+          if (nextMcpStatus) {
+            setMcpStatus({
+              loading: nextMcpStatus.loading,
+              connected: nextMcpStatus.connected,
+              total: nextMcpStatus.total,
+              tools: nextMcpStatus.tools,
+              servers: (nextMcpStatus.servers ?? []).map((s: { name: string; status: string; error?: string | null }) => ({
+                name: s.name,
+                status: s.status,
+                error: s.error,
+              })),
+            });
+          }
+
           // If we have a message_id, create a special message to display it
           const messageId = event.payload.message_id;
           if (messageId) {
@@ -2100,6 +2211,9 @@ export function useSessionStream(
           if (mcpMsgId) {
             setMessages((prev) => prev.filter((m) => m.id !== mcpMsgId));
           }
+          setMcpStatus((prev) =>
+            prev ? { ...prev, loading: false } : null,
+          );
           break;
         }
 
@@ -2138,6 +2252,8 @@ export function useSessionStream(
       updateMessageById,
       setAwaitingFirstResponse,
       processSubagentEvent,
+      _estimateTokens,
+      setTokensPerSecond,
     ],
   );
 
@@ -3013,6 +3129,22 @@ export function useSessionStream(
     wsRef.current.send(JSON.stringify(message));
   }, []);
 
+  // Steer the current running turn with additional input
+  const steer = useCallback((text: string) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    const trimmedText = text.trim();
+    if (!trimmedText) return;
+    const message: JsonRpcRequest = {
+      jsonrpc: "2.0",
+      method: "steer",
+      id: uuidV4(),
+      params: { user_input: trimmedText },
+    };
+    wsRef.current.send(JSON.stringify(message));
+  }, []);
+
   // Auto-connect when sessionId changes
   useLayoutEffect(() => {
     /**
@@ -3082,6 +3214,10 @@ export function useSessionStream(
     isAwaitingFirstResponse,
     contextUsage,
     tokenUsage,
+    tokensPerSecond,
+    terminalTitle,
+    activityHint,
+    mcpStatus,
     currentStep,
     isConnected,
     isReplayingHistory,
@@ -3097,6 +3233,7 @@ export function useSessionStream(
     error,
     planMode,
     sendSetPlanMode,
+    steer,
     slashCommands,
   };
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import importlib
 import io
 import os
@@ -41,6 +42,16 @@ def is_clipboard_available() -> bool:
         return False
 
 
+def is_wsl() -> bool:
+    """Detect whether we are running inside Windows Subsystem for Linux."""
+    try:
+        with open("/proc/version", "rb") as f:
+            version = f.read()
+        return b"Microsoft" in version or b"WSL" in version
+    except Exception:
+        return False
+
+
 def is_media_clipboard_available() -> bool:
     """Check if the media clipboard (xclip/wl-paste) is available.
 
@@ -48,9 +59,15 @@ def is_media_clipboard_available() -> bool:
     DISPLAY is not set, but images can still be read through xclip or
     wl-paste (e.g. via clipboard bridging tools like cc-clip that shim
     xclip over an SSH tunnel).
+
+    On WSL, when native Linux clipboard tools are missing, we fall back
+    to powershell.exe which can bridge the Windows clipboard.
     """
     if sys.platform == "linux":
-        return shutil.which("xclip") is not None or shutil.which("wl-paste") is not None
+        if shutil.which("xclip") is not None or shutil.which("wl-paste") is not None:
+            return True
+        # WSL can use Windows PowerShell to read clipboard images.
+        return is_wsl() and shutil.which("powershell.exe") is not None
     # macOS and Windows use native APIs that do not require external tools.
     return True
 
@@ -81,6 +98,11 @@ def grab_media_from_clipboard() -> ClipboardResult | None:
         image = _grab_image_linux()
         if image is not None:
             return ClipboardResult(images=(image,), file_paths=())
+        # WSL fallback: read image from Windows clipboard via PowerShell.
+        if is_wsl():
+            image = _grab_image_wsl()
+            if image is not None:
+                return ClipboardResult(images=(image,), file_paths=())
         return None
 
     # 3. On Windows and other platforms, use Pillow's default implementation.
@@ -155,6 +177,58 @@ def _grab_image_linux() -> Image.Image | None:
         # Otherwise, a real error (e.g. tool broken) — try next candidate.
 
     return None
+
+
+def _grab_image_wsl() -> Image.Image | None:
+    """Read image from Windows clipboard inside WSL using PowerShell.
+
+    Uses powershell.exe to access the Windows Forms Clipboard API,
+    converts the image to PNG, and returns it as a PIL Image.
+    Returns None if there is no image on the clipboard or powershell
+    is unavailable.
+    """
+    if shutil.which("powershell.exe") is None:
+        return None
+
+    ps_script = (
+        "Add-Type -AssemblyName System.Windows.Forms; "
+        "$img = [System.Windows.Forms.Clipboard]::GetImage(); "
+        "if ($img) { "
+        "  $ms = New-Object System.IO.MemoryStream; "
+        "  $img.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png); "
+        "  $bytes = $ms.ToArray(); "
+        "  $base64 = [Convert]::ToBase64String($bytes); "
+        "  Write-Host $base64 "
+        "} else { "
+        "  Write-Host 'NO_IMAGE' "
+        "}"
+    )
+
+    try:
+        p = subprocess.run(
+            ["powershell.exe", "-Command", ps_script],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+
+    if p.returncode != 0:
+        return None
+
+    stdout = p.stdout.strip()
+    if not stdout or stdout == "NO_IMAGE":
+        return None
+
+    try:
+        img_bytes = base64.b64decode(stdout)
+        data = io.BytesIO(img_bytes)
+        im = Image.open(data)
+        im.load()
+        return im
+    except Exception:
+        return None
 
 
 def _classify_file_paths(

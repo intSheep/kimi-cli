@@ -36,7 +36,7 @@ from kimi_cli.notifications import (
     build_notification_message,
     extract_notification_ids,
 )
-from kimi_cli.skill import Skill, read_skill_text
+from kimi_cli.skill import Skill, normalize_skill_name, read_skill_text
 from kimi_cli.skill.flow import Flow, FlowEdge, FlowNode, parse_choice
 from kimi_cli.soul import (
     LLMNotSet,
@@ -92,6 +92,7 @@ if TYPE_CHECKING:
 SKILL_COMMAND_PREFIX = "skill:"
 FLOW_COMMAND_PREFIX = "flow:"
 DEFAULT_MAX_FLOW_MOVES = 1000
+
 
 def classify_api_error(e: Exception) -> tuple[str, int | None]:
     """Classify an LLM API exception into (error_type, status_code).
@@ -609,11 +610,15 @@ class KimiSoul:
                 ).strip()
                 text = text.strip('"').strip("'")
                 return text[:70] if text else None
-            except (APIConnectionError, APIEmptyResponseError, APITimeoutError,
-                    APIStatusError) as e:
+            except (
+                APIConnectionError,
+                APIEmptyResponseError,
+                APITimeoutError,
+                APIStatusError,
+            ) as e:
                 last_exc = e
                 if attempt < max_attempts - 1:
-                    wait = min(0.5 * (2 ** attempt), 8.0)
+                    wait = min(0.5 * (2**attempt), 8.0)
                     logger.debug(
                         "Activity generation failed ({attempt}/{max}), retry in {wait}s: {exc}",
                         attempt=attempt + 1,
@@ -884,9 +889,12 @@ class KimiSoul:
     def _build_slash_commands(self) -> list[SlashCommand[Any]]:
         commands: list[SlashCommand[Any]] = list(soul_slash_registry.list_commands())
         seen_names = {cmd.name for cmd in commands}
+        disabled = self._runtime.disabled_skills
 
         for skill in self._runtime.skills.values():
             if skill.type not in ("standard", "flow"):
+                continue
+            if normalize_skill_name(skill.name) in disabled:
                 continue
             name = f"{SKILL_COMMAND_PREFIX}{skill.name}"
             if name in seen_names:
@@ -901,12 +909,15 @@ class KimiSoul:
                     func=self._make_skill_runner(skill),
                     description=skill.description or "",
                     aliases=[],
+                    hidden=True,
                 )
             )
             seen_names.add(name)
 
         for skill in self._runtime.skills.values():
             if skill.type != "flow":
+                continue
+            if normalize_skill_name(skill.name) in disabled:
                 continue
             if skill.flow is None:
                 logger.warning("Flow skill {name} has no flow; skipping", name=skill.name)
@@ -925,11 +936,17 @@ class KimiSoul:
                     func=runner.run,
                     description=skill.description or "",
                     aliases=[],
+                    hidden=True,
                 )
             )
             seen_names.add(command_name)
 
         return commands
+
+    def refresh_slash_commands(self) -> None:
+        """Rebuild slash commands after skill enablement changes."""
+        self._slash_commands = self._build_slash_commands()
+        self._slash_command_map = self._index_slash_commands(self._slash_commands)
 
     @staticmethod
     def _index_slash_commands(
@@ -992,8 +1009,8 @@ class KimiSoul:
         # ── 1a. MCP deferred loading ──────────────────────────────────────────
         if isinstance(self._agent.toolset, KimiToolset):
             await self.start_background_mcp_loading()
-            loading = bool((snapshot := self._mcp_status_snapshot()) and snapshot.loading)
-            if loading:
+            snapshot = self._mcp_status_snapshot()
+            if snapshot:
                 wire_send(StatusUpdate(mcp_status=snapshot))
 
         # ═══════════════════════════════════════════════════════════════════════

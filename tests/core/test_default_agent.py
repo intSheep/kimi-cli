@@ -278,7 +278,10 @@ async def test_default_agent_background_bash_guardrails(runtime: Runtime):
         [
             "Agent",
             "AskUserQuestion",
-            "SetTodoList", "SetActivityHint", "SetTerminalTitle", "Shell",
+            "SetTodoList",
+            "SetActivityHint",
+            "SetTerminalTitle",
+            "Shell",
             "TaskList",
             "TaskOutput",
             "TaskStop",
@@ -291,7 +294,9 @@ async def test_default_agent_background_bash_guardrails(runtime: Runtime):
             "SearchWeb",
             "FetchURL",
             "ExitPlanMode",
-            "EnterPlanMode", "query_stock"]
+            "EnterPlanMode",
+            "query_stock",
+        ]
     )
     assert agent.toolset.tools[0].description == snapshot(
         """\

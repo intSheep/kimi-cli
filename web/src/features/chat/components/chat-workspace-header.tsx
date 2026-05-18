@@ -135,6 +135,7 @@ export function ChatWorkspaceHeader({
               </TooltipContent>
             </Tooltip>
           ) : null}
+
         </div>
       </div>
       <div className="flex items-center justify-end gap-2">

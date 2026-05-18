@@ -59,7 +59,9 @@ def test_default_config_dump():
             "merge_all_available_skills": True,
             "extra_skill_dirs": [],
             "telemetry": True,
-            "skip_afk_prompt_injection": False, "llm_retry_max_attempts": 5}
+            "skip_afk_prompt_injection": False,
+            "llm_retry_max_attempts": 5,
+        }
     )
 
 

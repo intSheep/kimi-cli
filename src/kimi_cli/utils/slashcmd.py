@@ -10,6 +10,8 @@ class SlashCommand[F: Callable[..., None | Awaitable[None]]]:
     description: str
     func: F
     aliases: list[str]
+    hidden: bool = False
+    """If true, the command is omitted from help and completion menus."""
 
     def display_name(self, trigger: str | None = None) -> str:
         """/name for canonical triggers, /name (alias) for alias triggers."""

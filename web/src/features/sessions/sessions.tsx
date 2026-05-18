@@ -21,6 +21,7 @@ import {
   RefreshCw,
   List,
   FolderTree,
+  LayoutList,
   ChevronDown,
   Pencil,
   Loader2,
@@ -30,6 +31,7 @@ import {
   Square,
   PanelLeftClose,
 } from "lucide-react";
+import type { SessionStatus } from "@/lib/api/models";
 import { Virtuoso } from "react-virtuoso";
 import { KimiCliBrand } from "@/components/kimi-cli-brand";
 import {
@@ -66,12 +68,19 @@ type SessionSummary = {
   updatedAt: string;
   workDir?: string | null;
   lastUpdated: Date;
+  status?: SessionStatus | null;
 };
 
-type ViewMode = "list" | "grouped";
+type ViewMode = "list" | "grouped" | "by_status";
 
 type SessionGroup = {
   workDir: string;
+  displayName: string;
+  sessions: SessionSummary[];
+};
+
+type SessionStatusGroup = {
+  phase: NonNullable<SessionSummary["status"]>["phase"];
   displayName: string;
   sessions: SessionSummary[];
 };
@@ -86,6 +95,101 @@ function shortenPath(path: string, maxLen = 30): string {
   const parts = path.split("/").filter(Boolean);
   if (parts.length <= 2) return path;
   return ".../" + parts.slice(-2).join("/");
+}
+
+/** Working — orbiting satellites around a core, alive and kinetic */
+function WorkingIndicator(): ReactElement {
+  return (
+    <div className="relative size-4 shrink-0">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="size-[5px] rounded-full bg-emerald-500" />
+      </div>
+      <div
+        className="absolute inset-0 session-orbit"
+        style={{ animation: "orbit 2s linear infinite" }}
+      >
+        <div className="absolute top-[1px] left-1/2 -translate-x-1/2 size-[3px] rounded-full bg-emerald-400/80" />
+      </div>
+      <div
+        className="absolute inset-0 session-orbit"
+        style={{ animation: "orbit 1.2s linear infinite reverse" }}
+      >
+        <div className="absolute bottom-[2px] left-1/2 -translate-x-1/2 size-[2px] rounded-full bg-emerald-300/60" />
+      </div>
+    </div>
+  );
+}
+
+/** Completed — hand-drawn checkmark animates in */
+function CompletedIndicator(): ReactElement {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
+      <path
+        d="M4 8.5 L7 11.5 L12.5 5"
+        stroke="#10b981"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="session-draw-check"
+        style={{
+          strokeDasharray: 14,
+          strokeDashoffset: 14,
+          animation: "draw-check 0.4s ease-out 0.1s forwards",
+        }}
+      />
+    </svg>
+  );
+}
+
+/** Need input — ripple drop waiting for your response */
+function NeedInputIndicator(): ReactElement {
+  return (
+    <div className="relative size-4 shrink-0 flex items-center justify-center">
+      <div className="size-[5px] rounded-full bg-amber-400 relative z-10" />
+      <div
+        className="absolute inset-0 flex items-center justify-center session-ripple"
+        style={{ animation: "ripple-drop 2s ease-out infinite" }}
+      >
+        <div className="size-full rounded-full border border-amber-400/40" />
+      </div>
+      <div
+        className="absolute inset-0 flex items-center justify-center session-ripple"
+        style={{ animation: "ripple-drop 2s ease-out 0.6s infinite" }}
+      >
+        <div className="size-full rounded-full border border-amber-400/30" />
+      </div>
+    </div>
+  );
+}
+
+/** Created — gentle emergence, a new seed breathing to life */
+function CreatedIndicator(): ReactElement {
+  return (
+    <div className="relative size-4 shrink-0 flex items-center justify-center">
+      <div
+        className="size-[4px] rounded-full bg-slate-400 dark:bg-slate-500"
+        style={{
+          animation:
+            "created-emerge 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, created-breathe 3s ease-in-out 0.5s infinite",
+        }}
+      />
+    </div>
+  );
+}
+
+function SessionStatusIndicator({ phase }: { phase?: string | null }): ReactElement | null {
+  switch (phase) {
+    case "working":
+      return <WorkingIndicator />;
+    case "completed":
+      return <CompletedIndicator />;
+    case "need_input":
+      return <NeedInputIndicator />;
+    case "created":
+      return <CreatedIndicator />;
+    default:
+      return null;
+  }
 }
 
 type SessionsSidebarProps = {
@@ -211,7 +315,8 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const stored = localStorage.getItem(VIEW_MODE_KEY);
-    return stored === "grouped" ? "grouped" : "list";
+    if (stored === "grouped" || stored === "by_status") return stored;
+    return "list";
   });
 
   // Archived section expanded state
@@ -351,6 +456,34 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
         const bLatest = Math.max(...b.sessions.map(s => s.lastUpdated.getTime()));
         return bLatest - aLatest;
       });
+  }, [filteredSessions, viewMode]);
+
+  // Group sessions by status phase
+  const statusGroups = useMemo((): SessionStatusGroup[] => {
+    if (viewMode !== "by_status") return [];
+
+    const groups = new Map<string, SessionSummary[]>();
+    for (const session of filteredSessions) {
+      const key = session.status?.phase || "created";
+      const existing = groups.get(key) || [];
+      groups.set(key, [...existing, session]);
+    }
+
+    const PHASE_ORDER = ["working", "need_input", "completed", "created"];
+    const PHASE_LABELS: Record<string, string> = {
+      working: "Working",
+      need_input: "Need Input",
+      completed: "Completed",
+      created: "Created",
+    };
+
+    return PHASE_ORDER
+      .filter((key) => groups.has(key))
+      .map((key) => ({
+        phase: key as SessionStatusGroup["phase"],
+        displayName: PHASE_LABELS[key],
+        sessions: groups.get(key)!,
+      }));
   }, [filteredSessions, viewMode]);
 
   useEffect(() => {
@@ -833,146 +966,157 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
               <ToggleGroupItem value="grouped" aria-label="Grouped view" title="Grouped by folder" className="h-8 w-8 px-0">
                 <FolderTree className="size-3.5" />
               </ToggleGroupItem>
+              <ToggleGroupItem value="by_status" aria-label="Status view" title="Grouped by status" className="h-8 w-8 px-0">
+                <LayoutList className="size-3.5" />
+              </ToggleGroupItem>
             </ToggleGroup>
           </div>
           )}
 
           <div className="flex-1 min-h-0 flex flex-col">
             <div className="flex-1 min-h-0">
-            {viewMode === "grouped" ? (
+            {viewMode === "grouped" || viewMode === "by_status" ? (
               <div className="flex h-full flex-col">
                 <div className="flex-1 overflow-y-auto overflow-x-hidden [-webkit-overflow-scrolling:touch] px-3 pb-4 pr-1">
                   <ul className="space-y-1">
-                    {sessionGroups.map((group) => (
-                      <li key={group.workDir} className="group/dir">
-                        <Collapsible defaultOpen={group.sessions.some(s => s.id === selectedSessionId)}>
-                          <div className="flex items-center">
-                            <CollapsibleTrigger className="flex flex-1 min-w-0 items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary/50 group">
-                              <ChevronDown className="size-3 transition-transform group-data-[state=closed]:-rotate-90" />
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="flex-1 truncate text-left font-medium">
-                                    {group.displayName}
-                                  </span>
-                                </TooltipTrigger>
-                                {group.workDir !== "__other__" && (
-                                  <TooltipContent
-                                    side="right"
-                                  >
-                                    {group.workDir}
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                              <span className="text-[10px] text-muted-foreground">
-                                ({group.sessions.length})
-                              </span>
-                            </CollapsibleTrigger>
-                            {group.workDir !== "__other__" && onCreateSessionInDir && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    aria-label={`New session in ${group.displayName}`}
-                                    className="shrink-0 cursor-pointer rounded-md p-1 text-muted-foreground opacity-0 group-hover/dir:opacity-100 hover:bg-accent hover:text-foreground transition-all"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (hasPlatformModifier(e)) {
-                                        const url = new URL(window.location.origin + window.location.pathname);
-                                        url.searchParams.set("action", "create-in-dir");
-                                        url.searchParams.set("workDir", group.workDir);
-                                        window.open(url.toString(), "_blank");
-                                      } else {
-                                        onCreateSessionInDir(group.workDir);
-                                      }
-                                    }}
-                                  >
-                                    <Plus className="size-3.5" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent className="flex flex-col items-center gap-1" side="right">
-                                  <span>New session here</span>
-                                  <span className="text-xs text-muted-foreground">{newSessionShortcutModifier}+Click to open in new tab</span>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                          <CollapsibleContent>
-                            <ul className="pl-3 space-y-1 mt-1">
-                              {group.sessions.map((session) => {
-                                const isActive = session.id === selectedSessionId;
-                                const isEditing = editingSessionId === session.id;
-                                return (
-                                  <li key={session.id}>
-                                    <div className="flex w-full items-center gap-2">
-                                      <button
-                                        className={`flex-1 min-w-0 cursor-pointer text-left rounded-lg px-3 py-2 transition-colors ${
-                                          isActive
-                                            ? "bg-secondary"
-                                            : "hover:bg-secondary/60"
-                                        }`}
-                                        onClick={() => !isEditing && onSelectSession(session.id)}
-                                        onContextMenu={(event) =>
-                                          !isEditing && handleSessionContextMenu(event, session.id)
+                    {(viewMode === "grouped" ? sessionGroups : statusGroups).map((group) => {
+                      const groupKey = viewMode === "grouped" ? (group as SessionGroup).workDir : (group as SessionStatusGroup).phase;
+                      const workDir = viewMode === "grouped" ? (group as SessionGroup).workDir : undefined;
+                      return (
+                        <li key={groupKey} className="group/dir">
+                          <Collapsible defaultOpen={group.sessions.some(s => s.id === selectedSessionId)}>
+                            <div className="flex items-center">
+                              <CollapsibleTrigger className="flex flex-1 min-w-0 items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary/50 group">
+                                <ChevronDown className="size-3 transition-transform group-data-[state=closed]:-rotate-90" />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="flex-1 truncate text-left font-medium">
+                                      {group.displayName}
+                                    </span>
+                                  </TooltipTrigger>
+                                  {viewMode === "grouped" && workDir !== "__other__" && (
+                                    <TooltipContent
+                                      side="right"
+                                    >
+                                      {workDir}
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                                <span className="text-[10px] text-muted-foreground">
+                                  ({group.sessions.length})
+                                </span>
+                              </CollapsibleTrigger>
+                              {viewMode === "grouped" && workDir !== "__other__" && onCreateSessionInDir && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      aria-label={`New session in ${group.displayName}`}
+                                      className="shrink-0 cursor-pointer rounded-md p-1 text-muted-foreground opacity-0 group-hover/dir:opacity-100 hover:bg-accent hover:text-foreground transition-all"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (hasPlatformModifier(e)) {
+                                          const url = new URL(window.location.origin + window.location.pathname);
+                                          url.searchParams.set("action", "create-in-dir");
+                                          url.searchParams.set("workDir", workDir ?? "");
+                                          window.open(url.toString(), "_blank");
+                                        } else {
+                                          onCreateSessionInDir(workDir!);
                                         }
-                                        type="button"
-                                      >
-                                        {isEditing ? (
-                                          <input
-                                            autoFocus
-                                            value={editingTitle}
-                                            onChange={(e) => setEditingTitle(e.target.value)}
-                                            onBlur={handleSaveEdit}
-                                            onKeyDown={(e) => {
-                                              if (e.key === "Enter") {
-                                                e.preventDefault();
-                                                handleSaveEdit();
-                                              }
-                                              if (e.key === "Escape") {
-                                                e.preventDefault();
-                                                handleCancelEdit();
-                                              }
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="w-full text-sm font-medium text-foreground bg-background border border-input rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
-                                          />
-                                        ) : (
-                                          <Tooltip delayDuration={500}>
-                                            <TooltipTrigger asChild>
-                                              <p className="text-sm font-medium text-foreground truncate">
-                                                {normalizeTitle(session.title)}
-                                              </p>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="right" className="max-w-md">
-                                              {normalizeTitle(session.title)}
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        )}
-                                        {!isEditing && (
-                                          <span className="text-[10px] text-muted-foreground mt-1 block">
-                                            {session.updatedAt}
-                                          </span>
-                                        )}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        aria-label="Delete session"
-                                        className="md:hidden inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          openDeleteConfirm(session);
-                                        }}
-                                      >
-                                        <Trash2 className="size-3.5" />
-                                      </button>
-                                    </div>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      </li>
-                    ))}
+                                      }}
+                                    >
+                                      <Plus className="size-3.5" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="flex flex-col items-center gap-1" side="right">
+                                    <span>New session here</span>
+                                    <span className="text-xs text-muted-foreground">{newSessionShortcutModifier}+Click to open in new tab</span>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                            <CollapsibleContent>
+                              <ul className="pl-3 space-y-1 mt-1">
+                                {group.sessions.map((session) => {
+                                  const isActive = session.id === selectedSessionId;
+                                  const isEditing = editingSessionId === session.id;
+                                  return (
+                                    <li key={session.id}>
+                                      <div className="flex w-full items-center gap-2">
+                                        <button
+                                          className={cn(
+                                            "flex-1 min-w-0 cursor-pointer text-left rounded-lg px-3 py-2 transition-colors",
+                                            isActive
+                                              ? "bg-secondary"
+                                              : "hover:bg-secondary/60"
+                                          )}
+                                          onClick={() => !isEditing && onSelectSession(session.id)}
+                                          onContextMenu={(event) =>
+                                            !isEditing && handleSessionContextMenu(event, session.id)
+                                          }
+                                          type="button"
+                                        >
+                                          {isEditing ? (
+                                            <input
+                                              autoFocus
+                                              value={editingTitle}
+                                              onChange={(e) => setEditingTitle(e.target.value)}
+                                              onBlur={handleSaveEdit}
+                                              onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                  e.preventDefault();
+                                                  handleSaveEdit();
+                                                }
+                                                if (e.key === "Escape") {
+                                                  e.preventDefault();
+                                                  handleCancelEdit();
+                                                }
+                                              }}
+                                              onClick={(e) => e.stopPropagation()}
+                                              className="w-full text-sm font-medium text-foreground bg-background border border-input rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+                                            />
+                                          ) : (
+                                            <div className="flex items-center gap-1.5">
+                                              <SessionStatusIndicator phase={session.status?.phase} />
+                                              <Tooltip delayDuration={500}>
+                                                <TooltipTrigger asChild>
+                                                  <p className="text-sm font-medium text-foreground truncate">
+                                                    {normalizeTitle(session.title)}
+                                                  </p>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="right" className="max-w-md">
+                                                  {normalizeTitle(session.title)}
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </div>
+                                          )}
+                                          {!isEditing && (
+                                            <span className="text-[10px] text-muted-foreground mt-1 block">
+                                              {session.updatedAt}
+                                            </span>
+                                          )}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          aria-label="Delete session"
+                                          className="md:hidden inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            openDeleteConfirm(session);
+                                          }}
+                                        >
+                                          <Trash2 className="size-3.5" />
+                                        </button>
+                                      </div>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </li>
+                      );
+                    })}
                   </ul>
                   {renderLoadMore()}
                 </div>
@@ -1019,11 +1163,10 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                         </button>
                       )}
                       <button
-                        className={`flex-1 min-w-0 cursor-pointer text-left rounded-md px-2.5 py-1.5 transition-colors ${
-                          showCheckbox ? "" : (isActive
-                            ? "bg-secondary"
-                            : "hover:bg-secondary/60")
-                        }`}
+                        className={cn(
+                          "flex-1 min-w-0 cursor-pointer text-left rounded-md px-2.5 py-1.5 transition-colors",
+                          !showCheckbox && isActive && "bg-secondary"
+                        )}
                         onClick={() => {
                           if (showCheckbox) {
                             toggleSessionSelection(session.id);
@@ -1057,6 +1200,7 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                           />
                         ) : (
                           <div className="flex items-center gap-2">
+                            <SessionStatusIndicator phase={session.status?.phase} />
                             <Tooltip delayDuration={500}>
                               <TooltipTrigger asChild>
                                 <p className="text-sm font-medium text-foreground truncate flex-1">

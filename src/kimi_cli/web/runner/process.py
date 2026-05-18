@@ -29,6 +29,7 @@ from kimi_cli.utils.subprocess_env import get_clean_env
 from kimi_cli.web.models import (
     SessionNoticeEvent,
     SessionNoticePayload,
+    SessionPhase,  # noqa: F401
     SessionState,
     SessionStatus,
 )
@@ -47,6 +48,13 @@ from kimi_cli.wire.jsonrpc import (
     JSONRPCSuccessResponse,
 )
 from kimi_cli.wire.serde import deserialize_wire_message
+from kimi_cli.wire.types import (
+    ApprovalRequest,
+    ApprovalResponse,
+    QuestionRequest,
+    TurnBegin,
+    TurnEnd,
+)
 
 JSONRPCOutMessageAdapter = TypeAdapter[JSONRPCOutMessage](JSONRPCOutMessage)
 
@@ -81,9 +89,15 @@ class SessionProcess:
         self._in_flight_prompt_ids: set[str] = set()
         self._status_seq = 0
         self._worker_id: str | None = None
+        # Turn and pending-input tracking for session-phase categorisation
+        self._turn_active = False
+        self._has_turn_history = False
+        self._pending_approvals: set[str] = set()
+        self._pending_questions: set[str] = set()
         self._status = SessionStatus(
             session_id=self.session_id,
             state="stopped",
+            phase="created",
             seq=self._status_seq,
             worker_id=self._worker_id,
             reason=None,
@@ -134,6 +148,16 @@ class SessionProcess:
         """Send the current status snapshot to a specific WebSocket."""
         await ws.send_text(new_session_status_message(self._status).model_dump_json())
 
+    def _compute_phase(self, state: SessionState) -> SessionPhase:
+        """Derive the user-facing session phase from internal tracking state."""
+        if state == "busy" or self._turn_active:
+            return "working"
+        if self._pending_approvals or self._pending_questions:
+            return "need_input"
+        if self._has_turn_history:
+            return "completed"
+        return "created"
+
     def _build_status(
         self,
         state: SessionState,
@@ -141,9 +165,11 @@ class SessionProcess:
         detail: str | None,
     ) -> SessionStatus | None:
         """Build a new status object if different from current."""
+        phase = self._compute_phase(state)
         current = self._status
         if (
             current.state == state
+            and current.phase == phase
             and current.reason == reason
             and current.detail == detail
             and current.worker_id == self._worker_id
@@ -153,6 +179,7 @@ class SessionProcess:
         status = SessionStatus(
             session_id=self.session_id,
             state=state,
+            phase=phase,
             seq=self._status_seq,
             worker_id=self._worker_id,
             reason=reason,
@@ -257,6 +284,11 @@ class SessionProcess:
             self._in_flight_prompt_ids.clear()
             self._worker_id = None
             self._expecting_exit = False
+            # Worker stop means all in-flight requests are lost;
+            # clear pending state so phase reflects reality.
+            self._turn_active = False
+            self._pending_approvals.clear()
+            self._pending_questions.clear()
             if emit_status:
                 await self._emit_status("stopped", reason=reason or "stop")
 
@@ -380,8 +412,40 @@ class SessionProcess:
                     self._in_flight_prompt_ids.remove(message.id)
                 if was_busy and not self.is_busy:
                     await self._emit_status("idle", reason="prompt_error")
+            case JSONRPCEventMessage(params=TurnBegin()):
+                self._turn_active = True
+                self._has_turn_history = True
+            case JSONRPCEventMessage(params=TurnEnd()):
+                self._turn_active = False
+            case JSONRPCEventMessage(params=ApprovalResponse(request_id=request_id)):
+                self._pending_approvals.discard(request_id)
+            case JSONRPCRequestMessage(params=ApprovalRequest(id=request_id)):
+                self._pending_approvals.add(request_id)
+            case JSONRPCRequestMessage(params=QuestionRequest(id=request_id)):
+                self._pending_questions.add(request_id)
             case _:
                 return
+
+        # After any state-changing message, re-emit status if phase changed
+        match message:
+            case JSONRPCEventMessage(params=TurnBegin() | TurnEnd() | ApprovalResponse()):
+                status = self._build_status(
+                    self._status.state, self._status.reason, self._status.detail
+                )
+                if status is not None:
+                    await self._broadcast(new_session_status_message(status).model_dump_json())
+            case JSONRPCRequestMessage(params=ApprovalRequest() | QuestionRequest()):
+                status = self._build_status(
+                    self._status.state, self._status.reason, self._status.detail
+                )
+                if status is not None:
+                    await self._broadcast(new_session_status_message(status).model_dump_json())
+            case _:
+                pass
+
+    def _infer_phase(self) -> SessionPhase:
+        """Infer phase purely from in-memory tracking (for running sessions)."""
+        return self._compute_phase(self._status.state)
 
     async def _encode_uploaded_files(self) -> AsyncGenerator[ContentPart]:
         """Encode uploaded files for sending to the model."""
@@ -653,6 +717,23 @@ class SessionProcess:
                     JSONRPCSuccessResponse(id=in_message.id, result={}).model_dump_json()
                 )
                 return
+            elif isinstance(in_message, JSONRPCSuccessResponse | JSONRPCErrorResponse):
+                # Client responded to a pending approval or question request.
+                # Approval responses are also broadcast as events by the worker,
+                # but question responses are not, so we clear here for both.
+                phase_changed = False
+                if in_message.id in self._pending_approvals:
+                    self._pending_approvals.discard(in_message.id)
+                    phase_changed = True
+                if in_message.id in self._pending_questions:
+                    self._pending_questions.discard(in_message.id)
+                    phase_changed = True
+                if phase_changed:
+                    status = self._build_status(
+                        self._status.state, self._status.reason, self._status.detail
+                    )
+                    if status is not None:
+                        await self._broadcast(new_session_status_message(status).model_dump_json())
 
             new_message = await self._handle_in_message(in_message)
             if new_message is not None:

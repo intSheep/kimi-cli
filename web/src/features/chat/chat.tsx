@@ -53,6 +53,18 @@ type ChatWorkspaceProps = {
   contextUsage?: number;
   /** Current step token usage from backend */
   tokenUsage?: TokenUsage | null;
+  /** Current streaming tokens per second (estimated) */
+  tokensPerSecond?: number;
+  /** Current activity hint set by the agent */
+  activityHint?: string;
+  /** Current MCP loading status snapshot */
+  mcpStatus?: {
+    loading: boolean;
+    connected: number;
+    total: number;
+    tools: number;
+    servers: { name: string; status: string; error?: string | null }[];
+  } | null;
   /** Current step number */
   currentStep?: number;
   /** Current session configuration */
@@ -90,6 +102,8 @@ type ChatWorkspaceProps = {
   maxContextSize?: number;
   /** Fork session at a specific turn */
   onForkSession?: (turnIndex: number) => void;
+  /** Steer the current running turn with additional input */
+  onSteer?: (text: string) => void;
   /** Error message from the session stream */
   errorMessage?: string;
 };
@@ -106,6 +120,9 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
   sessionDescription,
   contextUsage = 0,
   tokenUsage = null,
+  tokensPerSecond = 0,
+  activityHint = "",
+  mcpStatus = null,
   currentStep = 0,
   currentSession,
   isReplayingHistory = false,
@@ -123,6 +140,7 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
   planMode = false,
   onPlanModeChange,
   onForkSession,
+  onSteer,
   errorMessage,
 }: ChatWorkspaceProps): ReactElement {
   const [blocksExpanded, setBlocksExpanded] = useState(false);
@@ -329,29 +347,33 @@ export const ChatWorkspace = memo(function ChatWorkspaceComponent({
                   />
                 ) : (
                   <div className="px-0 pb-0 pt-0 sm:px-3 sm:pb-3">
-                    <ChatPromptComposer
-                      status={status}
-                      onSubmit={onSubmit}
-                      canSendMessage={canSendMessage}
-                      currentSession={currentSession}
-                      isUploading={isUploading}
-                      isStreaming={isStreaming}
-                      isAwaitingIdle={isAwaitingIdle}
-                      isReplayingHistory={isReplayingHistory}
-                      onCancel={onCancel}
-                      onListSessionDirectory={onListSessionDirectory}
-                      gitDiffStats={gitDiffStats}
-                      isGitDiffLoading={isGitDiffLoading}
-                      slashCommands={slashCommands}
-                      planMode={planMode}
-                      onPlanModeChange={onPlanModeChange}
-                      activityStatus={activityStatus}
-                      usagePercent={usagePercent}
-                      usedTokens={usedTokens}
-                      maxTokens={maxTokens}
-                      tokenUsage={tokenUsage}
-                    />
-                  </div>
+                      <ChatPromptComposer
+                        status={status}
+                        onSubmit={onSubmit}
+                        canSendMessage={canSendMessage}
+                        currentSession={currentSession}
+                        isUploading={isUploading}
+                        isStreaming={isStreaming}
+                        isAwaitingIdle={isAwaitingIdle}
+                        isReplayingHistory={isReplayingHistory}
+                        onCancel={onCancel}
+                        onListSessionDirectory={onListSessionDirectory}
+                        gitDiffStats={gitDiffStats}
+                        isGitDiffLoading={isGitDiffLoading}
+                        slashCommands={slashCommands}
+                        planMode={planMode}
+                        onPlanModeChange={onPlanModeChange}
+                        onSteer={onSteer}
+                        activityStatus={activityStatus}
+                        activityHint={activityHint}
+                        usagePercent={usagePercent}
+                        usedTokens={usedTokens}
+                        maxTokens={maxTokens}
+                        tokenUsage={tokenUsage}
+                        tokensPerSecond={tokensPerSecond}
+                        mcpStatus={mcpStatus}
+                      />
+                    </div>
                 )}
               </div>
             )}

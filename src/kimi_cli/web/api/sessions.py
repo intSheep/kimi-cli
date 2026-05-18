@@ -38,6 +38,7 @@ from kimi_cli.web.runner.messages import new_session_status_message, send_histor
 from kimi_cli.web.runner.process import KimiCLIRunner
 from kimi_cli.web.store.sessions import (
     JointSession,
+    build_session_status_for_stopped_session,
     invalidate_sessions_cache,
     load_session_by_id,
     load_sessions_page,
@@ -277,7 +278,14 @@ async def list_sessions(
     for session in sessions:
         session_process = runner.get_session(session.session_id)
         session.is_running = session_process is not None and session_process.is_running
-        session.status = session_process.status if session_process else None
+        if session_process and session_process.is_running:
+            session.status = session_process.status
+        elif session.session_dir:
+            session.status = build_session_status_for_stopped_session(
+                Path(session.session_dir), session.session_id
+            )
+        else:
+            session.status = None
     return cast(list[Session], sessions)
 
 
@@ -291,7 +299,14 @@ async def get_session(
     if session is not None:
         session_process = runner.get_session(session_id)
         session.is_running = session_process is not None and session_process.is_running
-        session.status = session_process.status if session_process else None
+        if session_process and session_process.is_running:
+            session.status = session_process.status
+        elif session.session_dir:
+            session.status = build_session_status_for_stopped_session(
+                Path(session.session_dir), session.session_id
+            )
+        else:
+            session.status = None
     return session
 
 

@@ -1,0 +1,53 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - button:
+                    - img
+              - generic:
+                - generic:
+                  - generic:
+                    - log:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - paragraph: Create a session to begin
+                          - paragraph: Click the + button in the sidebar to start a new session
+                        - button:
+                          - img
+                          - generic: Create new session
+    - region "Notifications alt+T"
+    - generic:
+      - heading [level=2]: Create New Session
+      - paragraph: Search directories or type a new path
+  - dialog "Create New Session" [ref=e32]:
+    - generic [ref=e35]:
+      - generic [ref=e37]:
+        - img [ref=e38]
+        - combobox [expanded] [active] [ref=e41]
+      - listbox "Suggestions" [ref=e42]:
+        - generic [ref=e43]:
+          - generic [ref=e44]: Current Directory
+          - group "Current Directory" [ref=e45]:
+            - option "~ ↵" [selected] [ref=e46]:
+              - img
+              - generic [ref=e47]: ~
+              - generic: ↵
+          - separator [ref=e48]
+          - generic [ref=e49]: Recent Directories
+          - group "Recent Directories" [ref=e50]:
+            - option "~/myproject/hobbyflow" [ref=e51]:
+              - img
+              - generic [ref=e52]: ~/myproject/hobbyflow
+            - option "~/awesomeproject" [ref=e53]:
+              - img
+              - generic [ref=e54]: ~/awesomeproject
+            - option "~/myproject/kimi-cli" [ref=e55]:
+              - img
+              - generic [ref=e56]: ~/myproject/kimi-cli

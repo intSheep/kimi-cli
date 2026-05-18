@@ -147,7 +147,8 @@ def test_build_toolbar_tips_without_clipboard() -> None:
     ]
 
 
-def test_build_toolbar_tips_with_clipboard() -> None:
+def test_build_toolbar_tips_with_clipboard(monkeypatch) -> None:
+    monkeypatch.setattr("kimi_cli.ui.shell.prompt.is_wsl", lambda: False)
     assert _build_toolbar_tips(clipboard_available=True) == [
         "ctrl-x: toggle mode",
         "shift-tab: plan mode",
@@ -156,6 +157,20 @@ def test_build_toolbar_tips_with_clipboard() -> None:
         "/feedback: send feedback",
         "/theme: switch dark/light",
         "ctrl-v: paste clipboard",
+        "@: mention files",
+    ]
+
+
+def test_build_toolbar_tips_with_clipboard_wsl(monkeypatch) -> None:
+    monkeypatch.setattr("kimi_cli.ui.shell.prompt.is_wsl", lambda: True)
+    assert _build_toolbar_tips(clipboard_available=True) == [
+        "ctrl-x: toggle mode",
+        "shift-tab: plan mode",
+        "ctrl-o: editor",
+        "ctrl-j: newline",
+        "/feedback: send feedback",
+        "/theme: switch dark/light",
+        "f5: paste clipboard",
         "@: mention files",
     ]
 

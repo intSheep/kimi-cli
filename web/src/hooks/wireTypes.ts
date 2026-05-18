@@ -32,6 +32,8 @@ export type SessionStatusPayload = {
   reason?: string | null;
   detail?: string | null;
   updated_at: string;
+  title?: string | null;
+  activity?: string | null;
 };
 
 // Event types from the wire protocol
@@ -136,6 +138,14 @@ export type TokenUsage = {
   input_cache_creation: number;
 };
 
+export type McpStatusPayload = {
+  loading: boolean;
+  connected: number;
+  total: number;
+  tools: number;
+  servers?: { name: string; status: string; error?: string | null }[];
+};
+
 export type StatusUpdateEvent = {
   type: "StatusUpdate";
   payload: {
@@ -143,6 +153,9 @@ export type StatusUpdateEvent = {
     token_usage?: TokenUsage | null;
     message_id?: string;
     plan_mode?: boolean | null;
+    title?: string | null;
+    activity?: string | null;
+    mcp_status?: McpStatusPayload | null;
   };
 };
 

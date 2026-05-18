@@ -64,11 +64,21 @@ type ChatPromptComposerProps = {
   slashCommands?: SlashCommandDef[];
   planMode?: boolean;
   onPlanModeChange?: (enabled: boolean) => void;
+  onSteer?: (text: string) => void;
   activityStatus?: ActivityDetail;
   usagePercent?: number;
   usedTokens?: number;
   maxTokens?: number;
   tokenUsage?: TokenUsage | null;
+  tokensPerSecond?: number;
+  mcpStatus?: {
+    loading: boolean;
+    connected: number;
+    total: number;
+    tools: number;
+    servers: { name: string; status: string; error?: string | null }[];
+  } | null;
+  activityHint?: string;
 };
 
 export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
@@ -87,11 +97,15 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
   slashCommands = [],
   planMode = false,
   onPlanModeChange,
+  onSteer,
   activityStatus,
   usagePercent,
   usedTokens,
   maxTokens,
   tokenUsage,
+  tokensPerSecond,
+  mcpStatus,
+  activityHint,
 }: ChatPromptComposerProps): ReactElement {
   const promptController = usePromptInputController();
   const attachmentContext = usePromptInputAttachments();
@@ -198,11 +212,15 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
         isGitDiffLoading={isGitDiffLoading}
         workDir={currentSession?.workDir}
         planMode={planMode}
+        onSteer={onSteer}
         activityStatus={activityStatus}
         usagePercent={usagePercent}
         usedTokens={usedTokens}
         maxTokens={maxTokens}
         tokenUsage={tokenUsage}
+        tokensPerSecond={tokensPerSecond}
+        mcpStatus={mcpStatus}
+        activityHint={activityHint}
       />
 
       <PromptInput

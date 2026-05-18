@@ -36,7 +36,7 @@ type ChatWorkspaceContainerProps = {
   selectedSessionId: string;
   currentSession?: Session;
   sessionDescription?: string;
-  onSessionStatus: (status: SessionStatus) => void;
+  onSessionStatus: (status: SessionStatus & { activity?: string }) => void;
   onStreamStatusChange?: (status: ChatStatus) => void;
   uploadSessionFile: (
     sessionId: string,
@@ -119,11 +119,15 @@ export function ChatWorkspaceContainer({
     cancel: cancelStream,
     contextUsage,
     tokenUsage,
+    tokensPerSecond,
+    activityHint,
+    mcpStatus,
     currentStep,
     isConnected: isStreamConnected,
     isReplayingHistory,
     planMode,
     sendSetPlanMode,
+    steer,
     slashCommands,
     error: streamError,
   } = sessionStream;
@@ -375,6 +379,9 @@ export function ChatWorkspaceContainer({
       contextUsage={contextUsage}
       maxContextSize={maxContextSize}
       tokenUsage={tokenUsage}
+      tokensPerSecond={tokensPerSecond}
+      activityHint={activityHint}
+      mcpStatus={mcpStatus}
       currentStep={currentStep}
       currentSession={currentSession}
       isReplayingHistory={isReplayingHistory}
@@ -389,6 +396,7 @@ export function ChatWorkspaceContainer({
       onPlanModeChange={handlePlanModeChange}
       errorMessage={streamError?.message}
       onForkSession={onForkSession ? handleForkSession : undefined}
+      onSteer={steer}
     />
   );
 }

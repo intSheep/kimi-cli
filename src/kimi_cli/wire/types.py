@@ -203,6 +203,8 @@ class StatusUpdate(BaseModel):
     """The current MCP startup snapshot. None means no change."""
     activity: str | None = None
     """Current activity hint. None means no change."""
+    title: str | None = None
+    """Current terminal title. None means no change."""
 
 
 class Notification(BaseModel):

@@ -180,10 +180,7 @@ async def test_wire_message_serde():
                     "total": 1,
                     "tools": 0,
                     "servers": [
-                        {
-                            "name": "context7",
-                            "status": "connecting",
-                            "tools": [], "error": None}
+                        {"name": "context7", "status": "connecting", "tools": [], "error": None}
                     ],
                 },
             },

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 
@@ -53,10 +54,8 @@ def set_terminal_title(title: str) -> None:
     fd = _get_tty_fd()
     if fd is None:
         return
-    try:
+    with contextlib.suppress(OSError):
         os.write(fd, f"\033]0;{title}\007".encode())
-    except OSError:
-        pass
 
 
 def init_process_name(name: str = "Kimi Code") -> None:

@@ -68,6 +68,7 @@ from kimi_cli.utils.clipboard import (
     grab_media_from_clipboard,
     is_clipboard_available,
     is_media_clipboard_available,
+    is_wsl,
 )
 from kimi_cli.utils.logging import logger
 from kimi_cli.utils.slashcmd import SlashCommand
@@ -102,6 +103,8 @@ class SlashCommandCompleter(Completer):
         words: list[str] = []
 
         for cmd in sorted(self._available_commands, key=lambda c: c.name):
+            if cmd.hidden:
+                continue
             if cmd.name not in self._command_lookup:
                 self._command_lookup[cmd.name] = []
                 words.append(cmd.name)
@@ -1170,7 +1173,13 @@ def _build_toolbar_tips(clipboard_available: bool) -> list[str]:
         "/theme: switch dark/light",
     ]
     if clipboard_available:
-        tips.append("ctrl-v: paste clipboard")
+        # In WSL, Windows Terminal intercepts Ctrl+V for its own paste
+        # (bracketed paste for text), so advertise F5 as the app-level
+        # media-paste shortcut.
+        if is_wsl():
+            tips.append("f5: paste clipboard")
+        else:
+            tips.append("ctrl-v: paste clipboard")
     tips.append("@: mention files")
     return tips
 
@@ -1506,6 +1515,25 @@ class CustomPromptSession:
                     self._insert_pasted_text(event.current_buffer, clipboard_data.text)
                     event.app.invalidate()
 
+            # F5 fallback for terminals (e.g. Windows Terminal + WSL) that
+            # intercept Ctrl+V and send bracketed-paste instead of the raw key.
+            @_kb.add("f5", eager=True)
+            def _(event: KeyPressEvent) -> None:
+                from kimi_cli.telemetry import track
+
+                track("shortcut_paste")
+                if self._try_paste_media(event):
+                    return
+                if clipboard_available:
+                    try:
+                        clipboard_data = event.app.clipboard.get_data()
+                    except Exception:
+                        return
+                    if clipboard_data is None:  # type: ignore[reportUnnecessaryComparison]
+                        return
+                    self._insert_pasted_text(event.current_buffer, clipboard_data.text)
+                    event.app.invalidate()
+
         # Only use PyperclipClipboard when pyperclip actually works.
         # PromptSession built-in keybindings (ctrl-k, ctrl-w, ctrl-y)
         # use clipboard without error handling, so a broken clipboard
@@ -1687,6 +1715,22 @@ class CustomPromptSession:
                 buff.document = Document(text=refolded, cursor_position=len(refolded))
 
         event.app.create_background_task(_run_editor())
+
+    def update_slash_commands(
+        self,
+        agent_mode_slash_commands: Sequence[SlashCommand[Any]],
+        shell_mode_slash_commands: Sequence[SlashCommand[Any]],
+    ) -> None:
+        """Refresh completers after slash commands change (e.g. skill enable/disable)."""
+        self._agent_mode_completer = merge_completers(
+            [
+                SlashCommandCompleter(agent_mode_slash_commands),
+                LocalFileMentionCompleter(KaosPath.cwd().unsafe_to_local_path()),
+            ],
+            deduplicate=True,
+        )
+        self._shell_mode_completer = SlashCommandCompleter(shell_mode_slash_commands)
+        self._apply_mode()
 
     def _apply_mode(self, event: KeyPressEvent | None = None) -> None:
         # Apply mode to the active buffer (not the PromptSession itself)

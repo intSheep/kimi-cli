@@ -50,9 +50,16 @@ async def run_worker(session_id: UUID) -> None:
     resumed = (session.dir / "state.json").exists()
 
     # Create KimiCLI instance with MCP configuration
+    # Defer MCP loading so the worker starts quickly; MCP tools will be loaded
+    # in the background when the first turn begins (KimiSoul.run() calls
+    # start_background_mcp_loading()).
     try:
         kimi_cli = await KimiCLI.create(
-            session, mcp_configs=mcp_configs or None, resumed=resumed, ui_mode="wire"
+            session,
+            mcp_configs=mcp_configs or None,
+            resumed=resumed,
+            ui_mode="wire",
+            defer_mcp_loading=True,
         )
     except MCPConfigError as exc:
         logger.warning(
@@ -60,7 +67,9 @@ async def run_worker(session_id: UUID) -> None:
             path=default_mcp_file,
             error=exc,
         )
-        kimi_cli = await KimiCLI.create(session, mcp_configs=None, resumed=resumed, ui_mode="wire")
+        kimi_cli = await KimiCLI.create(
+            session, mcp_configs=None, resumed=resumed, ui_mode="wire", defer_mcp_loading=True
+        )
 
     # Run in wire stdio mode
     await kimi_cli.run_wire_stdio()

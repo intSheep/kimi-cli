@@ -33,13 +33,17 @@ from kosong.utils.typing import JsonType
 from kimi_cli import logger
 from kimi_cli.exception import InvalidToolError, MCPRuntimeError
 from kimi_cli.hooks.engine import HookEngine
+from kimi_cli.soul import wire_send
 from kimi_cli.tools import SkipThisTool
 from kimi_cli.wire.types import (
     AudioURLPart,
     ContentPart,
     ImageURLPart,
+    MCPLoadingBegin,
+    MCPLoadingEnd,
     MCPServerSnapshot,
     MCPStatusSnapshot,
+    Notification,
     TextPart,
     ToolCall,
     ToolCallRequest,
@@ -617,6 +621,7 @@ class KimiToolset:
 
         async def _connect():
             _toast_mcp("connecting to mcp servers...")
+            wire_send(MCPLoadingBegin())
             tasks = [
                 asyncio.create_task(_connect_server(server_name, server_info))
                 for server_name, server_info in self._mcp_servers.items()
@@ -633,11 +638,26 @@ class KimiToolset:
 
             if failed_servers:
                 _toast_mcp("mcp connection failed")
+                wire_send(MCPLoadingEnd())
+                wire_send(
+                    Notification(
+                        id=f"mcp-fail-{asyncio.get_event_loop().time()}",
+                        category="mcp",
+                        type="connection_failed",
+                        source_kind="system",
+                        source_id="mcp",
+                        title="MCP connection failed",
+                        body=f"Failed to connect: {', '.join(failed_servers.keys())}",
+                        severity="warning",
+                        created_at=asyncio.get_event_loop().time(),
+                    )
+                )
                 raise MCPRuntimeError(f"Failed to connect MCP servers: {failed_servers}")
             if any(info.status == "unauthorized" for info in self._mcp_servers.values()):
                 _toast_mcp("mcp authorization needed")
             else:
                 _toast_mcp("mcp servers connected")
+            wire_send(MCPLoadingEnd())
 
         for mcp_config in mcp_configs:
             if not mcp_config.mcpServers:
