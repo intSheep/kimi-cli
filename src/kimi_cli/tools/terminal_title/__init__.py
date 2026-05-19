@@ -42,6 +42,18 @@ class SetTerminalTitle(CallableTool2[Params]):
         from kimi_cli.wire.types import StatusUpdate
 
         wire_send(StatusUpdate(title=params.title))
+
+        # Persist the title to session state so web/vis can reuse it
+        if self._runtime.role == "root":
+            from kimi_cli.session_state import load_session_state, save_session_state
+
+            session_dir = self._runtime.session.dir
+            state = load_session_state(session_dir)
+            if not state.title_generated:
+                state.custom_title = params.title
+                state.title_generated = True
+                save_session_state(state, session_dir)
+
         return ToolReturnValue(
             is_error=False,
             output="",

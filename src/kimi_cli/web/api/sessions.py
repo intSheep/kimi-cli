@@ -760,13 +760,16 @@ async def fork_session_endpoint(
     )
 
 
-@router.post("/{session_id}/generate-title", summary="Generate session title using AI")
+@router.post("/{session_id}/generate-title", summary="Generate session title")
 async def generate_session_title(
     session_id: UUID,
     request: GenerateTitleRequest | None = None,
     runner: KimiCLIRunner = Depends(get_runner),
 ) -> GenerateTitleResponse:
-    """Generate a concise session title using AI based on the first conversation turn.
+    """Generate a session title.
+
+    Prefer the title already set by SetTerminalTitle or manual rename.
+    Fallback to shortening the first user message from wire.jsonl.
 
     If request body is empty or parameters are missing, the backend will
     automatically read the first turn from wire.jsonl.
@@ -775,123 +778,41 @@ async def generate_session_title(
     session_dir = session.kimi_cli_session.dir
 
     from kimi_cli.session_state import load_session_state, save_session_state
+    from kimi_cli.utils.string import shorten
 
     state = load_session_state(session_dir)
 
-    # Check if title was already generated (avoid duplicate calls)
+    # Already finalized by SetTerminalTitle, manual rename, or previous call
     if state.title_generated:
         return GenerateTitleResponse(title=state.custom_title or "Untitled")
 
     # Get message content: prefer request parameters, otherwise read from wire.jsonl
     user_message = request.user_message if request else None
-    assistant_response = request.assistant_response if request else None
 
-    if not user_message or not assistant_response:
+    if not user_message:
         first_turn = extract_first_turn_from_wire(session_dir)
         if first_turn:
-            user_message, assistant_response = first_turn
+            user_message, _ = first_turn
 
     # If still no user message, return default title
     if not user_message:
         return GenerateTitleResponse(title="Untitled")
 
-    from kimi_cli.utils.string import shorten
-
     user_text = user_message.strip()
     user_text = " ".join(user_text.split())
     fallback_title = shorten(user_text, width=50) or "Untitled"
 
-    # If AI generation failed too many times, use fallback and mark as generated
-    if state.title_generate_attempts >= 3:
-        fresh = load_session_state(session_dir)
-        # Respect a title finalized by another request/user action while we
-        # were preparing a fallback.
-        if fresh.title_generated:
-            invalidate_sessions_cache()
-            return GenerateTitleResponse(title=fresh.custom_title or "Untitled")
-        fresh.custom_title = fallback_title
-        fresh.title_generated = True
-        save_session_state(fresh, session_dir)
-        invalidate_sessions_cache()
-        return GenerateTitleResponse(title=fallback_title)
-
-    # Try to generate title using AI
-    title = fallback_title
-    ai_generated = False
-    try:
-        from kosong import generate
-        from kosong.message import Message
-
-        from kimi_cli.auth.oauth import OAuthManager
-        from kimi_cli.config import load_config
-        from kimi_cli.llm import create_llm
-
-        config = load_config()
-        model_name = config.default_model
-
-        if model_name and model_name in config.models:
-            model_config = config.models[model_name]
-            provider_config = config.providers.get(model_config.provider)
-
-            if provider_config:
-                oauth = OAuthManager(config)
-                await oauth.ensure_fresh()
-                llm = create_llm(provider_config, model_config, oauth=oauth)
-
-                if llm:
-                    system_prompt = (
-                        "Generate a concise session title (max 50 characters) "
-                        "based on the conversation. "
-                        "Only respond with the title text, nothing else. "
-                        "No quotes, no explanation."
-                    )
-
-                    prompt = f"""User: {user_message[:300]}
-Assistant: {(assistant_response or "")[:300]}
-
-Title:"""
-
-                    result = await generate(
-                        chat_provider=llm.chat_provider,
-                        system_prompt=system_prompt,
-                        tools=[],
-                        history=[Message(role="user", content=prompt)],
-                    )
-
-                    generated_title = result.message.extract_text().strip()
-                    # Remove quotes if present
-                    generated_title = generated_title.strip("\"'")
-
-                    if generated_title and len(generated_title) <= 50:
-                        title = generated_title
-                        ai_generated = True
-                    elif generated_title:
-                        title = shorten(generated_title, width=50)
-                        ai_generated = True
-
-    except Exception as e:
-        logger.warning(f"Failed to generate title using AI: {e}")
-        # Keep fallback_title, ai_generated stays False
-
-    # Read-modify-write: reload fresh state to avoid overwriting
-    # worker changes made during the LLM call
+    # Read-modify-write: reload fresh state to avoid overwriting concurrent changes
     fresh = load_session_state(session_dir)
-    # Another request or manual rename may have finalized the title while the
-    # LLM call was in flight. Preserve that newer title instead of clobbering it.
     if fresh.title_generated:
         invalidate_sessions_cache()
         return GenerateTitleResponse(title=fresh.custom_title or "Untitled")
-    fresh.custom_title = title
-    if ai_generated:
-        fresh.title_generated = True
-    else:
-        fresh.title_generate_attempts = fresh.title_generate_attempts + 1
+    fresh.custom_title = fallback_title
+    fresh.title_generated = True
     save_session_state(fresh, session_dir)
-
-    # Invalidate cache
     invalidate_sessions_cache()
 
-    return GenerateTitleResponse(title=title)
+    return GenerateTitleResponse(title=fallback_title)
 
 
 @router.websocket("/{session_id}/stream")
