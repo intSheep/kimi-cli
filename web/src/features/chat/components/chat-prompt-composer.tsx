@@ -251,6 +251,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
         tokensPerSecond={tokensPerSecond}
         mcpStatus={mcpStatus}
         activityHint={activityHint}
+        sessionId={currentSession?.sessionId}
       />
 
       <PromptInput

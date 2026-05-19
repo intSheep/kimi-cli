@@ -46,6 +46,7 @@ type PromptToolbarProps = {
   } | null;
   activityHint?: string;
   onSteer?: (text: string) => void;
+  sessionId?: string;
 };
 
 // ─── Main toolbar ────────────────────────────────────────────
@@ -64,8 +65,9 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
   mcpStatus,
   activityHint,
   onSteer,
+  sessionId,
 }: PromptToolbarProps): ReactElement | null {
-  const queue = useQueueStore((s) => s.queue);
+  const queue = useQueueStore((s) => (sessionId ? s.queues[sessionId] ?? [] : []));
   const todoItems = useToolEventsStore((s) => s.todoItems);
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const prevQueueLenRef = useRef(0);
@@ -106,7 +108,7 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
           "rounded-md border border-border bg-background",
           activeTab !== "changes" && "max-h-32 overflow-y-auto py-1 px-0.5",
         )}>
-          {activeTab === "queue" && <ToolbarQueuePanel queue={queue} onSteer={onSteer} />}
+          {activeTab === "queue" && <ToolbarQueuePanel queue={queue} sessionId={sessionId} onSteer={onSteer} />}
           {activeTab === "changes" && stats && (
             <ToolbarChangesPanel stats={stats} workDir={workDir} />
           )}

@@ -134,22 +134,15 @@ export function ChatWorkspaceContainer({
 
   const clearNewFiles = useToolEventsStore((state) => state.clearNewFiles);
   const enqueue = useQueueStore((s) => s.enqueue);
-  const queueLength = useQueueStore((s) => s.queue.length);
+  const queues = useQueueStore((s) => s.queues);
+  const queueLength = queues[selectedSessionId ?? ""]?.length ?? 0;
   const dequeue = useQueueStore((s) => s.dequeue);
-  const clearQueue = useQueueStore((s) => s.clearQueue);
 
   useEffect(() => {
     if (status === "streaming") {
       clearNewFiles();
     }
   }, [status, clearNewFiles]);
-
-  // Clear queue when session changes (must run before auto-send to prevent
-  // sending stale queued messages to the wrong session)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: selectedSessionId triggers queue clear on session switch
-  useEffect(() => {
-    clearQueue();
-  }, [selectedSessionId, clearQueue]);
 
   // Auto-send next queued message when status becomes ready
   const prevStatusRef = useRef(status);
@@ -160,13 +153,13 @@ export function ChatWorkspaceContainer({
       prevStatusRef.current === "error";
     prevStatusRef.current = status;
 
-    if (status === "ready" && wasProcessing && queueLength > 0) {
-      const next = dequeue();
+    if (status === "ready" && wasProcessing && queueLength > 0 && selectedSessionId) {
+      const next = dequeue(selectedSessionId);
       if (next) {
         sendMessage(next.text);
       }
     }
-  }, [status, queueLength, dequeue, sendMessage]);
+  }, [status, queueLength, dequeue, sendMessage, selectedSessionId]);
 
   useEffect(() => {
     onStreamStatusChange?.(status);
@@ -288,8 +281,8 @@ export function ChatWorkspaceContainer({
           return;
         }
         const messageText = message.text.trim();
-        if (messageText) {
-          enqueue(messageText);
+        if (messageText && selectedSessionId) {
+          enqueue(selectedSessionId, messageText);
           toast.info("Message queued", {
             description: "It will be sent when the current response finishes.",
           });

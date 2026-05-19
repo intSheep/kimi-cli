@@ -6,41 +6,61 @@ export interface QueuedItem {
 }
 
 type QueueStore = {
-  queue: QueuedItem[];
-  enqueue: (text: string) => void;
-  removeFromQueue: (id: string) => void;
-  editQueueItem: (id: string, text: string) => void;
-  moveQueueItemUp: (id: string) => void;
-  dequeue: () => QueuedItem | undefined;
-  clearQueue: () => void;
+  queues: Record<string, QueuedItem[]>;
+  enqueue: (sessionId: string, text: string) => void;
+  removeFromQueue: (sessionId: string, id: string) => void;
+  editQueueItem: (sessionId: string, id: string, text: string) => void;
+  moveQueueItemUp: (sessionId: string, id: string) => void;
+  dequeue: (sessionId: string) => QueuedItem | undefined;
+  clearQueue: (sessionId: string) => void;
 };
 
 export const useQueueStore = create<QueueStore>((set, get) => ({
-  queue: [],
-  enqueue: (text) =>
+  queues: {},
+  enqueue: (sessionId, text) =>
     set((s) => ({
-      queue: [...s.queue, { id: crypto.randomUUID(), text }],
+      queues: {
+        ...s.queues,
+        [sessionId]: [...(s.queues[sessionId] ?? []), { id: crypto.randomUUID(), text }],
+      },
     })),
-  removeFromQueue: (id) =>
-    set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
-  editQueueItem: (id, text) =>
+  removeFromQueue: (sessionId, id) =>
     set((s) => ({
-      queue: s.queue.map((q) => (q.id === id ? { ...q, text } : q)),
+      queues: {
+        ...s.queues,
+        [sessionId]: (s.queues[sessionId] ?? []).filter((q) => q.id !== id),
+      },
     })),
-  moveQueueItemUp: (id) =>
+  editQueueItem: (sessionId, id, text) =>
+    set((s) => ({
+      queues: {
+        ...s.queues,
+        [sessionId]: (s.queues[sessionId] ?? []).map((q) =>
+          q.id === id ? { ...q, text } : q
+        ),
+      },
+    })),
+  moveQueueItemUp: (sessionId, id) =>
     set((s) => {
-      const idx = s.queue.findIndex((q) => q.id === id);
+      const queue = s.queues[sessionId] ?? [];
+      const idx = queue.findIndex((q) => q.id === id);
       if (idx <= 0) return s;
-      const next = [...s.queue];
+      const next = [...queue];
       [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-      return { queue: next };
+      return { queues: { ...s.queues, [sessionId]: next } };
     }),
-  dequeue: () => {
-    const { queue } = get();
+  dequeue: (sessionId) => {
+    const { queues } = get();
+    const queue = queues[sessionId] ?? [];
     if (queue.length === 0) return undefined;
     const [first, ...rest] = queue;
-    set({ queue: rest });
+    set({ queues: { ...queues, [sessionId]: rest } });
     return first;
   },
-  clearQueue: () => set({ queue: [] }),
+  clearQueue: (sessionId) =>
+    set((s) => {
+      const next = { ...s.queues };
+      delete next[sessionId];
+      return { queues: next };
+    }),
 }));

@@ -26,7 +26,7 @@ import { useQueueStore, type QueuedItem } from "../../queue-store";
 
 // ─── Sub-components ──────────────────────────────────────────
 
-function QueueItemRow({ item, isFirst, onEdit, onSteer }: { item: QueuedItem; isFirst: boolean; onEdit: (id: string) => void; onSteer: (text: string) => void }): ReactElement {
+function QueueItemRow({ item, isFirst, sessionId, onEdit, onSteer }: { item: QueuedItem; isFirst: boolean; sessionId?: string; onEdit: (id: string) => void; onSteer: (text: string) => void }): ReactElement {
   const removeFromQueue = useQueueStore((s) => s.removeFromQueue);
   const moveQueueItemUp = useQueueStore((s) => s.moveQueueItemUp);
 
@@ -38,7 +38,7 @@ function QueueItemRow({ item, isFirst, onEdit, onSteer }: { item: QueuedItem; is
       <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="size-5 text-muted-foreground hover:text-foreground" onClick={() => { removeFromQueue(item.id); onSteer(item.text); }}>
+            <Button variant="ghost" size="icon-sm" className="size-5 text-muted-foreground hover:text-foreground" onClick={() => { if (sessionId) { removeFromQueue(sessionId, item.id); onSteer(item.text); } }}>
               <SendIcon className="size-3" />
             </Button>
           </TooltipTrigger>
@@ -55,7 +55,7 @@ function QueueItemRow({ item, isFirst, onEdit, onSteer }: { item: QueuedItem; is
         {!isFirst && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="size-5" onClick={() => moveQueueItemUp(item.id)}>
+              <Button variant="ghost" size="icon-sm" className="size-5" onClick={() => { if (sessionId) moveQueueItemUp(sessionId, item.id); }}>
                 <ArrowUpIcon className="size-3" />
               </Button>
             </TooltipTrigger>
@@ -64,7 +64,7 @@ function QueueItemRow({ item, isFirst, onEdit, onSteer }: { item: QueuedItem; is
         )}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="size-5 text-muted-foreground hover:text-destructive" onClick={() => removeFromQueue(item.id)}>
+            <Button variant="ghost" size="icon-sm" className="size-5 text-muted-foreground hover:text-destructive" onClick={() => { if (sessionId) removeFromQueue(sessionId, item.id); }}>
               <Trash2Icon className="size-3" />
             </Button>
           </TooltipTrigger>
@@ -75,12 +75,12 @@ function QueueItemRow({ item, isFirst, onEdit, onSteer }: { item: QueuedItem; is
   );
 }
 
-function EditingItemRow({ item, onDone }: { item: QueuedItem; onDone: () => void }): ReactElement {
+function EditingItemRow({ item, sessionId, onDone }: { item: QueuedItem; sessionId?: string; onDone: () => void }): ReactElement {
   const [text, setText] = useState(item.text);
   const editQueueItem = useQueueStore((s) => s.editQueueItem);
 
   const handleSave = useCallback(() => {
-    if (text.trim()) editQueueItem(item.id, text.trim());
+    if (text.trim() && sessionId) editQueueItem(sessionId, item.id, text.trim());
     onDone();
   }, [text, item.id, editQueueItem, onDone]);
 
@@ -113,11 +113,13 @@ function EditingItemRow({ item, onDone }: { item: QueuedItem; onDone: () => void
 
 type ToolbarQueuePanelProps = {
   queue: QueuedItem[];
+  sessionId?: string;
   onSteer?: (text: string) => void;
 };
 
 export const ToolbarQueuePanel = memo(function ToolbarQueuePanelComponent({
   queue,
+  sessionId,
   onSteer,
 }: ToolbarQueuePanelProps): ReactElement {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -127,9 +129,9 @@ export const ToolbarQueuePanel = memo(function ToolbarQueuePanelComponent({
     <>
       {queue.map((item, idx) =>
         editingId === item.id ? (
-          <EditingItemRow key={item.id} item={item} onDone={handleEditDone} />
+          <EditingItemRow key={item.id} item={item} sessionId={sessionId} onDone={handleEditDone} />
         ) : (
-          <QueueItemRow key={item.id} item={item} isFirst={idx === 0} onEdit={setEditingId} onSteer={onSteer ?? (() => undefined)} />
+          <QueueItemRow key={item.id} item={item} isFirst={idx === 0} sessionId={sessionId} onEdit={setEditingId} onSteer={onSteer ?? (() => undefined)} />
         ),
       )}
     </>
