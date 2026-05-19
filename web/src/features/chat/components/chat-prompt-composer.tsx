@@ -244,6 +244,20 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
     return () => window.removeEventListener("kimi:focus-composer", handleFocusComposer);
   }, []);
 
+  // Auto-focus composer after switching to a different session
+  const hasMountedRef = useRef(false);
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    if (!currentSession?.sessionId) return;
+    const timer = setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [currentSession?.sessionId]);
+
   return (
     <div className="w-full">
       <PromptToolbar
