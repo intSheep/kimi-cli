@@ -11,6 +11,7 @@ import type { GitDiffStats } from "@/lib/api/models";
 import type { TokenUsage } from "@/hooks/wireTypes";
 import { useQueueStore } from "../../queue-store";
 import { useToolEventsStore } from "@/features/tool/store";
+import { useShallow } from "zustand/react/shallow";
 import { ToolbarActivityIndicator, type ActivityDetail } from "../activity-status-indicator";
 import { ToolbarQueuePanel, ToolbarQueueTab } from "./toolbar-queue";
 import { ToolbarChangesPanel, ToolbarChangesTab } from "./toolbar-changes";
@@ -67,7 +68,9 @@ export const PromptToolbar = memo(function PromptToolbarComponent({
   onSteer,
   sessionId,
 }: PromptToolbarProps): ReactElement | null {
-  const queue = useQueueStore((s) => (sessionId ? s.queues[sessionId] ?? [] : []));
+  const queue = useQueueStore(
+    useShallow((s) => (sessionId ? s.queues[sessionId] ?? [] : [])),
+  );
   const todoItems = useToolEventsStore((s) => s.todoItems);
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const prevQueueLenRef = useRef(0);

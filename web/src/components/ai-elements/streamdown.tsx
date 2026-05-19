@@ -9,26 +9,14 @@ import { CodeBlock } from "./code-block";
 // Selectively enable rehype plugins while maintaining security.
 // - 'raw': renders raw HTML embedded in markdown (XSS risk - DISABLED)
 // - 'harden': sanitizes HTML (strips tags - DISABLED)
-// - 'katex': math rendering (SAFE - only processes math delimiters)
-export const safeRehypePlugins: StreamdownProps["rehypePlugins"] = [
-  defaultRehypePlugins.katex,
-];
+// NOTE: streamdown 2.5.0 removed built-in katex; install rehype-katex separately if needed.
+export const safeRehypePlugins: StreamdownProps["rehypePlugins"] = [];
 
-// Override remark-math to enable single-dollar inline math ($...$).
-// Streamdown defaults to singleDollarTextMath: false, which only allows
-// block math ($$...$$). We enable it so both $...$ and $$...$$ work.
-const mathPlugin = defaultRemarkPlugins.math;
-const remarkMathWithInline = (
-  Array.isArray(mathPlugin)
-    ? [mathPlugin[0], { ...mathPlugin[1], singleDollarTextMath: true }]
-    : [mathPlugin, { singleDollarTextMath: true }]
-) as typeof mathPlugin;
-
+// NOTE: streamdown 2.5.0 removed built-in math/cjk plugins.
+// Install remark-math + rehype-katex separately if math support is needed.
 export const safeRemarkPlugins: StreamdownProps["remarkPlugins"] = [
   defaultRemarkPlugins.gfm,
-  remarkMathWithInline,
-  defaultRemarkPlugins.cjkFriendly,
-  defaultRemarkPlugins.cjkFriendlyGfmStrikethrough,
+  defaultRemarkPlugins.codeMeta,
 ];
 
 /**
@@ -175,7 +163,7 @@ const StreamdownCode = ({
   );
 };
 
-const StreamdownPre = ({ children }: ComponentProps<"pre">) => children;
+const StreamdownPre = ({ children, node }: ComponentProps<"pre"> & { node?: Element }) => children;
 
 export const streamdownComponents: StreamdownProps["components"] = {
   code: StreamdownCode,

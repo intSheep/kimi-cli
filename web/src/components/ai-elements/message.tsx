@@ -440,7 +440,14 @@ export const MessageResponse = memo(
         : children}
     </Streamdown>
   ),
-  (prevProps, nextProps) => prevProps.children === nextProps.children,
+  (prevProps, nextProps) => {
+    if (prevProps.children !== nextProps.children) return false;
+    if (prevProps.className !== nextProps.className) return false;
+    if (prevProps.mode !== nextProps.mode) return false;
+    if (prevProps.parseIncompleteMarkdown !== nextProps.parseIncompleteMarkdown)
+      return false;
+    return true;
+  },
 );
 
 MessageResponse.displayName = "MessageResponse";
