@@ -235,7 +235,10 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
   // Listen for focus-composer events from sidebar
   useEffect(() => {
     const handleFocusComposer = () => {
-      textareaRef.current?.focus();
+      // Defer focus so React re-renders (e.g. session switch) can settle first
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
     };
     window.addEventListener("kimi:focus-composer", handleFocusComposer);
     return () => window.removeEventListener("kimi:focus-composer", handleFocusComposer);

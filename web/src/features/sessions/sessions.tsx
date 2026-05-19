@@ -473,8 +473,8 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
       if (event.key === "Enter") {
         event.preventDefault();
         if (highlightedSessionId) {
-          onSelectSession(highlightedSessionId);
           window.dispatchEvent(new CustomEvent("kimi:focus-composer"));
+          onSelectSession(highlightedSessionId);
           setHighlightedSessionId(null);
         }
         return;
