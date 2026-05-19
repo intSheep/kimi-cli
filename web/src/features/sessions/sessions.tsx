@@ -1112,7 +1112,9 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                                         <button
                                           className={cn(
                                             "flex-1 min-w-0 cursor-pointer text-left rounded-lg px-3 py-2 transition-colors",
-                                            isActive
+                                            isActive && highlightedSessionId === session.id
+                                              ? "bg-secondary ring-2 ring-primary/50"
+                                              : isActive
                                               ? "bg-secondary"
                                               : highlightedSessionId === session.id
                                               ? "bg-primary/5 ring-1 ring-primary/20"
@@ -1215,6 +1217,8 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                     <div className={`flex w-full items-center gap-2  transition-colors rounded-lg ${
                           isSelected
                             ? "bg-primary/10 ring-1 ring-primary/30"
+                            : isActive && isHighlighted
+                            ? "bg-secondary ring-2 ring-primary/50"
                             : isActive
                             ? "bg-secondary"
                             : isHighlighted
