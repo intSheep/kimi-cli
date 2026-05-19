@@ -208,25 +208,35 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
     setIsExpanded((prev) => !prev);
   }, []);
 
-  // Global ArrowLeft to focus sidebar when composer is empty or focus is elsewhere
+  // Global keyboard shortcuts to move focus between composer and sidebar
   useEffect(() => {
     const handleKeyDown = (event: Event) => {
       if (!(event instanceof KeyboardEvent)) return;
-      if (event.key !== "ArrowLeft") return;
-      const active = document.activeElement;
-      // If focus is on our textarea and it's empty, allow switching
-      if (active === textareaRef.current) {
-        if (promptController.textInput.value === "") {
-          event.preventDefault();
-          window.dispatchEvent(new CustomEvent("kimi:focus-sidebar"));
+
+      if (event.key === "ArrowLeft") {
+        const active = document.activeElement;
+        // If focus is on our textarea and it's empty, allow switching
+        if (active === textareaRef.current) {
+          if (promptController.textInput.value === "") {
+            event.preventDefault();
+            window.dispatchEvent(new CustomEvent("kimi:focus-sidebar"));
+          }
+          return;
         }
+        // If focus is on any other input/textarea/contenteditable, don't intercept
+        if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+        if (active?.closest("[contenteditable='true']")) return;
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent("kimi:focus-sidebar"));
         return;
       }
-      // If focus is on any other input/textarea/contenteditable, don't intercept
-      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
-      if (active?.closest("[contenteditable='true']")) return;
-      event.preventDefault();
-      window.dispatchEvent(new CustomEvent("kimi:focus-sidebar"));
+
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+        if (document.activeElement === document.body) {
+          event.preventDefault();
+          textareaRef.current?.focus();
+        }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
