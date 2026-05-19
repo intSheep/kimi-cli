@@ -32,7 +32,7 @@ import {
   PanelLeftClose,
 } from "lucide-react";
 import type { SessionStatus } from "@/lib/api/models";
-import { Virtuoso } from "react-virtuoso";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { KimiCliBrand } from "@/components/kimi-cli-brand";
 import {
   Dialog,
@@ -330,6 +330,19 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [isMultiSelectArchived, setIsMultiSelectArchived] = useState(false); // true when selecting archived sessions
   const [isBulkOperating, setIsBulkOperating] = useState(false);
+  const [highlightedSessionId, setHighlightedSessionId] = useState<string | null>(null);
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const virtuosoRef = useRef<VirtuosoHandle | null>(null);
+
+  // Listen for focus-sidebar events from composer
+  useEffect(() => {
+    const handler = () => {
+      setHighlightedSessionId(selectedSessionId);
+      sidebarRef.current?.focus();
+    };
+    window.addEventListener("kimi:focus-sidebar", handler);
+    return () => window.removeEventListener("kimi:focus-sidebar", handler);
+  }, [selectedSessionId]);
 
   useEffect(() => {
     setSessionSearch(searchQuery);
@@ -755,7 +768,47 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
 
   return (
     <>
-      <aside className="flex h-full min-h-0 flex-col">
+      <aside
+        ref={sidebarRef}
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+            event.preventDefault();
+            const list = filteredSessions;
+            if (list.length === 0) return;
+
+            let idx = list.findIndex((s) => s.id === highlightedSessionId);
+            if (idx === -1) idx = list.findIndex((s) => s.id === selectedSessionId);
+            if (idx === -1) idx = 0;
+
+            if (event.key === "ArrowUp") {
+              idx = idx > 0 ? idx - 1 : list.length - 1;
+            } else {
+              idx = idx < list.length - 1 ? idx + 1 : 0;
+            }
+
+            const nextId = list[idx].id;
+            setHighlightedSessionId(nextId);
+            virtuosoRef.current?.scrollIntoView({ index: idx, behavior: "auto" });
+          }
+
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (highlightedSessionId) {
+              onSelectSession(highlightedSessionId);
+              window.dispatchEvent(new CustomEvent("kimi:focus-composer"));
+              setHighlightedSessionId(null);
+            }
+          }
+
+          if (event.key === "ArrowRight" || event.key === "Escape") {
+            event.preventDefault();
+            window.dispatchEvent(new CustomEvent("kimi:focus-composer"));
+            setHighlightedSessionId(null);
+          }
+        }}
+        className="flex h-full min-h-0 flex-col outline-none"
+      >
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
           <div className="flex items-center justify-between px-3 pt-2">
             <KimiCliBrand size="sm" showVersion={true} />
@@ -1048,6 +1101,8 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                                             "flex-1 min-w-0 cursor-pointer text-left rounded-lg px-3 py-2 transition-colors",
                                             isActive
                                               ? "bg-secondary"
+                                              : highlightedSessionId === session.id
+                                              ? "bg-primary/5 ring-1 ring-primary/20"
                                               : "hover:bg-secondary/60"
                                           )}
                                           onClick={() => !isEditing && onSelectSession(session.id)}
@@ -1123,6 +1178,7 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
               </div>
             ) : (
               <Virtuoso
+                ref={virtuosoRef}
                 data={filteredSessions}
                 className="h-full"
                 computeItemKey={(_index, session) => session.id}
@@ -1141,12 +1197,15 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
                   const isEditing = editingSessionId === session.id;
                   const isSelected = isMultiSelectMode && !isMultiSelectArchived && selectedSessionIds.has(session.id);
                   const showCheckbox = isMultiSelectMode && !isMultiSelectArchived;
+                  const isHighlighted = highlightedSessionId === session.id;
                   return (
                     <div className={`flex w-full items-center gap-2  transition-colors rounded-lg ${
                           isSelected
                             ? "bg-primary/10 ring-1 ring-primary/30"
                             : isActive
                             ? "bg-secondary"
+                            : isHighlighted
+                            ? "bg-primary/5 ring-1 ring-primary/20"
                             : "hover:bg-secondary/60"
                         }`}>
                       {showCheckbox && (

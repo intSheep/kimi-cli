@@ -40,6 +40,7 @@ import {
   type SyntheticEvent,
   memo,
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -111,6 +112,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
   const attachmentContext = usePromptInputAttachments();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isTextareaFocused, setIsTextareaFocused] = useState(false);
 
   const {
     isOpen: isMentionOpen,
@@ -177,6 +179,7 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
   const handleTextareaBlur = useCallback(() => {
     closeMentionMenu();
     closeSlashMenu();
+    setIsTextareaFocused(false);
   }, [closeMentionMenu, closeSlashMenu]);
 
   const handleTextareaKeyDown = useCallback(
@@ -190,8 +193,14 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
         handleMentionKeyDown(event);
         return;
       }
+
+      // Focus sidebar when input is empty and ArrowLeft is pressed
+      if (event.key === "ArrowLeft" && promptController.textInput.value === "") {
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent("kimi:focus-sidebar"));
+      }
     },
-    [isSlashOpen, isMentionOpen, handleSlashKeyDown, handleMentionKeyDown],
+    [isSlashOpen, isMentionOpen, handleSlashKeyDown, handleMentionKeyDown, promptController.textInput.value],
   );
 
   const handleFileError = useCallback(
@@ -203,6 +212,15 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
 
   const handleToggleExpand = useCallback(() => {
     setIsExpanded((prev) => !prev);
+  }, []);
+
+  // Listen for focus-composer events from sidebar
+  useEffect(() => {
+    const handleFocusComposer = () => {
+      textareaRef.current?.focus();
+    };
+    window.addEventListener("kimi:focus-composer", handleFocusComposer);
+    return () => window.removeEventListener("kimi:focus-composer", handleFocusComposer);
   }, []);
 
   return (
@@ -289,8 +307,14 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
                 onKeyUp={handleTextareaSelection}
                 onClick={handleTextareaSelection}
                 onBlur={handleTextareaBlur}
+                onFocus={() => setIsTextareaFocused(true)}
                 onKeyDown={handleTextareaKeyDown}
               />
+              {isTextareaFocused && promptController.textInput.value === "" && (
+                <div className="absolute bottom-1 left-2 text-[10px] text-muted-foreground/60 pointer-events-none select-none animate-in fade-in duration-200">
+                  ← 切换到会话列表
+                </div>
+              )}
               {/* Slash command menu - mutually exclusive with file mention menu */}
               <SlashCommandMenu
                 open={isSlashOpen && canSendMessage && !isMentionOpen}
