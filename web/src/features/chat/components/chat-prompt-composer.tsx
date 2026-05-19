@@ -214,8 +214,14 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
       if (!(event instanceof KeyboardEvent)) return;
       if (event.key !== "ArrowLeft") return;
       const active = document.activeElement;
-      // If focus is on our textarea and it's not empty, don't intercept
-      if (active === textareaRef.current && promptController.textInput.value !== "") return;
+      // If focus is on our textarea and it's empty, allow switching
+      if (active === textareaRef.current) {
+        if (promptController.textInput.value === "") {
+          event.preventDefault();
+          window.dispatchEvent(new CustomEvent("kimi:focus-sidebar"));
+        }
+        return;
+      }
       // If focus is on any other input/textarea/contenteditable, don't intercept
       if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
       if (active?.closest("[contenteditable='true']")) return;
