@@ -193,14 +193,8 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
         handleMentionKeyDown(event);
         return;
       }
-
-      // Focus sidebar when input is empty and ArrowLeft is pressed
-      if (event.key === "ArrowLeft" && promptController.textInput.value === "") {
-        event.preventDefault();
-        window.dispatchEvent(new CustomEvent("kimi:focus-sidebar"));
-      }
     },
-    [isSlashOpen, isMentionOpen, handleSlashKeyDown, handleMentionKeyDown, promptController.textInput.value],
+    [isSlashOpen, isMentionOpen, handleSlashKeyDown, handleMentionKeyDown],
   );
 
   const handleFileError = useCallback(
@@ -213,6 +207,24 @@ export const ChatPromptComposer = memo(function ChatPromptComposerComponent({
   const handleToggleExpand = useCallback(() => {
     setIsExpanded((prev) => !prev);
   }, []);
+
+  // Global ArrowLeft to focus sidebar when composer is empty or focus is elsewhere
+  useEffect(() => {
+    const handleKeyDown = (event: Event) => {
+      if (!(event instanceof KeyboardEvent)) return;
+      if (event.key !== "ArrowLeft") return;
+      const active = document.activeElement;
+      // If focus is on our textarea and it's not empty, don't intercept
+      if (active === textareaRef.current && promptController.textInput.value !== "") return;
+      // If focus is on any other input/textarea/contenteditable, don't intercept
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+      if (active?.closest("[contenteditable='true']")) return;
+      event.preventDefault();
+      window.dispatchEvent(new CustomEvent("kimi:focus-sidebar"));
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [promptController.textInput.value]);
 
   // Listen for focus-composer events from sidebar
   useEffect(() => {

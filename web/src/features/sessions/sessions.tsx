@@ -442,6 +442,55 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
     );
   }, [sessions, sessionSearch]);
 
+  // Global keyboard navigation when sidebar is active
+  useEffect(() => {
+    const handler = (event: Event) => {
+      if (!(event instanceof KeyboardEvent)) return;
+      if (highlightedSessionId === null) return;
+      if (event.defaultPrevented) return;
+
+      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        event.preventDefault();
+        const list = filteredSessions;
+        if (list.length === 0) return;
+
+        let idx = list.findIndex((s) => s.id === highlightedSessionId);
+        if (idx === -1) idx = list.findIndex((s) => s.id === selectedSessionId);
+        if (idx === -1) idx = 0;
+
+        if (event.key === "ArrowUp") {
+          idx = idx > 0 ? idx - 1 : list.length - 1;
+        } else {
+          idx = idx < list.length - 1 ? idx + 1 : 0;
+        }
+
+        const nextId = list[idx].id;
+        setHighlightedSessionId(nextId);
+        virtuosoRef.current?.scrollIntoView({ index: idx, behavior: "auto" });
+        return;
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        if (highlightedSessionId) {
+          onSelectSession(highlightedSessionId);
+          window.dispatchEvent(new CustomEvent("kimi:focus-composer"));
+          setHighlightedSessionId(null);
+        }
+        return;
+      }
+
+      if (event.key === "ArrowRight" || event.key === "Escape") {
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent("kimi:focus-composer"));
+        setHighlightedSessionId(null);
+        return;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [highlightedSessionId, filteredSessions, selectedSessionId, onSelectSession]);
+
   // Group sessions by workDir
   const sessionGroups = useMemo((): SessionGroup[] => {
     if (viewMode !== "grouped") return [];
@@ -771,42 +820,6 @@ export const SessionsSidebar = memo(function SessionsSidebarComponent({
       <aside
         ref={sidebarRef}
         tabIndex={0}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-            event.preventDefault();
-            const list = filteredSessions;
-            if (list.length === 0) return;
-
-            let idx = list.findIndex((s) => s.id === highlightedSessionId);
-            if (idx === -1) idx = list.findIndex((s) => s.id === selectedSessionId);
-            if (idx === -1) idx = 0;
-
-            if (event.key === "ArrowUp") {
-              idx = idx > 0 ? idx - 1 : list.length - 1;
-            } else {
-              idx = idx < list.length - 1 ? idx + 1 : 0;
-            }
-
-            const nextId = list[idx].id;
-            setHighlightedSessionId(nextId);
-            virtuosoRef.current?.scrollIntoView({ index: idx, behavior: "auto" });
-          }
-
-          if (event.key === "Enter") {
-            event.preventDefault();
-            if (highlightedSessionId) {
-              onSelectSession(highlightedSessionId);
-              window.dispatchEvent(new CustomEvent("kimi:focus-composer"));
-              setHighlightedSessionId(null);
-            }
-          }
-
-          if (event.key === "ArrowRight" || event.key === "Escape") {
-            event.preventDefault();
-            window.dispatchEvent(new CustomEvent("kimi:focus-composer"));
-            setHighlightedSessionId(null);
-          }
-        }}
         className="flex h-full min-h-0 flex-col outline-none"
       >
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
