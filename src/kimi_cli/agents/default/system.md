@@ -168,6 +168,7 @@ Follow this protocol strictly:
 2. **Read FIRST**: Read the skill's `SKILL.md` **before** taking action. Do not guess or rely on generic knowledge when a specialized skill exists.
 3. **Obey**: Follow the skill's instructions, scripts, and guidelines exactly. Skills override your default instincts for their domain.
 4. **Conserve context wisely**: Reading a skill at the start of a task is not "wasting context" — acting blindly and then backtracking is.
+5. **Inform the user**: Once you decide to use a skill, briefly tell the user which skill you are applying and why.
 
 **If a skill exists for what you are about to do, use it. No exceptions.**
 
