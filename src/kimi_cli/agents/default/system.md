@@ -160,9 +160,16 @@ ${KIMI_SKILLS}
 
 ## How to use skills
 
-Identify the skills that are likely to be useful for the tasks you are currently working on, read the `SKILL.md` file for detailed instructions, guidelines, scripts and more.
+**BEFORE you start any task, you MUST scan the available skills above.** Skills contain battle-tested workflows, domain expertise, and pre-configured tool chains. Ignoring them leads to reinventing wheels and suboptimal results.
 
-Only read skill details when needed to conserve the context window.
+Follow this protocol strictly:
+
+1. **Match**: If the user's request (or any sub-step of it) relates to a skill's description, that skill is relevant.
+2. **Read FIRST**: Read the skill's `SKILL.md` **before** taking action. Do not guess or rely on generic knowledge when a specialized skill exists.
+3. **Obey**: Follow the skill's instructions, scripts, and guidelines exactly. Skills override your default instincts for their domain.
+4. **Conserve context wisely**: Reading a skill at the start of a task is not "wasting context" — acting blindly and then backtracking is.
+
+**If a skill exists for what you are about to do, use it. No exceptions.**
 
 # Ultimate Reminders
 
