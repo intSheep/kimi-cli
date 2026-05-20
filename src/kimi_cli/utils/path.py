@@ -80,7 +80,7 @@ async def _collect_entries(
         except OSError:
             is_dir = False
         all_entries.append((entry.name, is_dir))
-    all_entries.sort(key=lambda e: (not e[1], e[0]))
+    all_entries.sort(key=lambda e: (not e[1], e[0].startswith("."), e[0]))
     return all_entries[:max_width], len(all_entries)
 
 

@@ -243,7 +243,11 @@ class Runtime:
         skills = await discover_skills_from_roots(scoped_roots)
         skills_by_name = index_skills(skills)
         logger.info("Discovered {count} skill(s)", count=len(skills))
-        skills_formatted = format_skills_for_prompt(skills)
+        # Only project-scoped skills are injected into the system prompt to keep
+        # the global context compact; other scopes are still indexed for runtime
+        # lookup so the model can trigger them on demand.
+        project_skills = [s for s in skills if s.scope == "project"]
+        skills_formatted = format_skills_for_prompt(project_skills)
 
         # Restore additional directories from session state, pruning stale entries
         additional_dirs: list[KaosPath] = []

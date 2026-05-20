@@ -93,6 +93,28 @@ async def test_list_directory_dirs_before_files(temp_work_dir: KaosPath) -> None
     )
 
 
+async def test_list_directory_hidden_entries_deferred(temp_work_dir: KaosPath) -> None:
+    """Dot-prefixed entries are sorted after visible ones so truncation favors useful dirs."""
+    await (temp_work_dir / ".hidden_dir").mkdir()
+    await (temp_work_dir / ".hidden_dir" / "a.txt").write_text("a")
+    await (temp_work_dir / ".hidden_file").write_text("h")
+    await (temp_work_dir / "visible_dir").mkdir()
+    await (temp_work_dir / "visible_dir" / "b.txt").write_text("b")
+    await (temp_work_dir / "visible_file").write_text("v")
+
+    out = await list_directory(temp_work_dir)
+    assert out == snapshot(
+        """\
+├── visible_dir/
+│   └── b.txt
+├── .hidden_dir/
+│   └── a.txt
+├── visible_file
+└── .hidden_file\
+"""
+    )
+
+
 async def test_list_directory_empty(temp_work_dir: KaosPath) -> None:
     """Empty directory returns a placeholder string."""
     out = await list_directory(temp_work_dir)
